@@ -459,7 +459,11 @@ defmodule PhoenixKitDashboards.DashboardsTest do
     } do
       {:ok, d} = Dashboards.add_widget(dashboard, "core.clock")
       clock = List.last(d.layout)["id"]
-      {:ok, d} = Dashboards.place_widget_grid(d, clock, "l1", 0, 0)
+      # Park the clock clear of the setup note ((0,0) 16x8) and shrink it to
+      # the normal view's floor so the analog switch genuinely grows the
+      # height (at the default 12x8 the no-op guard would skip growth).
+      {:ok, d} = Dashboards.place_widget_grid(d, clock, "l1", 20, 0)
+      {:ok, d} = Dashboards.resize_widget(d, clock, "l1", 12, 4)
 
       # A legacy/tampered row stores "w" as a string with a valid integer
       # "h" — grow_on_layout must coerce "w" before the `p["x"] + w` bound

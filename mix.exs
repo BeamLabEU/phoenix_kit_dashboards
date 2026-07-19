@@ -76,11 +76,13 @@ defmodule PhoenixKitDashboards.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, Repo helper, and
-      # the ModuleRegistry we query to discover widget providers. Floor is 1.7.179
-      # — the release that ships core migration V139 (the per-dashboard `config`
-      # column: type, home tier, customized breakpoints). V133 (1.7.145) created
-      # the phoenix_kit_dashboards table; an older 1.7.x would resolve the pin yet
-      # lack the `config` column the layout engine reads.
+      # the ModuleRegistry we query to discover widget providers. Floor is 1.7.189
+      # — the release that ships PhoenixKit.SchemaPrefix (applied to every
+      # table-backed schema in this module). It can't go below 1.7.179 anyway:
+      # that's core migration V139 (the per-dashboard `config` column: type +
+      # named layouts), and V133 (1.7.145) created the phoenix_kit_dashboards
+      # table; an older 1.7.x would resolve an older pin yet lack the `config`
+      # column the layout engine reads.
       pk_dep(:phoenix_kit, "~> 1.7.189"),
 
       # LiveView powers the dashboard builder and the widget LiveComponents.
@@ -109,7 +111,10 @@ defmodule PhoenixKitDashboards.MixProject do
   defp docs do
     [
       main: "PhoenixKitDashboards",
-      source_ref: "v#{@version}"
+      # Repo tags are BARE version numbers (0.2.1, no "v" prefix) — see
+      # AGENTS.md "Versioning & Releases". A "v"-prefixed source_ref would
+      # point every ExDoc source link at a tag that doesn't exist.
+      source_ref: "#{@version}"
     ]
   end
 end

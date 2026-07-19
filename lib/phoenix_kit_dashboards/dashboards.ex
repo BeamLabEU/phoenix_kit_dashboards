@@ -500,7 +500,10 @@ defmodule PhoenixKitDashboards.Dashboards do
       layout =
         Enum.map(dashboard.layout, fn
           %{"id" => ^instance_id} = inst ->
-            Layout.put_placement(inst, layout_id, %{"x" => x, "y" => y, "w" => w})
+            # Persist the coerced h too (like resize_instance/grow_on_layout
+            # do) — healing a legacy/tampered string span, not just reading
+            # past it on every render.
+            Layout.put_placement(inst, layout_id, %{"x" => x, "y" => y, "w" => w, "h" => h})
 
           inst ->
             inst
