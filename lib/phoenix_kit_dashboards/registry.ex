@@ -162,7 +162,13 @@ defmodule PhoenixKitDashboards.Registry do
 
     ([PhoenixKitDashboards | discovered] ++ config_providers())
     |> Enum.uniq()
-    |> Enum.filter(&function_exported?(&1, @provider_callback, 0))
+    # ensure_loaded before function_exported?: on a cold VM a discovered
+    # module that hasn't been called yet isn't loaded, and
+    # function_exported?/3 returns false WITHOUT loading — silently
+    # dropping that module's widgets from the catalog until something
+    # else happens to touch it. (config_providers/0 already guards; the
+    # ModuleRegistry-discovered list didn't.)
+    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, @provider_callback, 0)))
   rescue
     e ->
       Logger.warning("[Dashboards] Provider discovery failed: #{Exception.message(e)}")

@@ -500,7 +500,11 @@ defmodule PhoenixKitDashboards.Dashboards do
       layout =
         Enum.map(dashboard.layout, fn
           %{"id" => ^instance_id} = inst ->
-            Layout.put_placement(inst, layout_id, %{"x" => x, "y" => y, "w" => w})
+            # Write the COERCED h too: a legacy/tampered row storing "h" as
+            # a string would otherwise survive the placement merge and keep
+            # tripping integer pattern-matches downstream — placing a widget
+            # heals its geometry.
+            Layout.put_placement(inst, layout_id, %{"x" => x, "y" => y, "w" => w, "h" => h})
 
           inst ->
             inst
@@ -1329,6 +1333,7 @@ defmodule PhoenixKitDashboards.Dashboards do
           |> Layout.placement(layout_id)
           |> Map.put_new("pos", idx)
           |> default_span(item, layout_id)
+          |> normalize_span()
 
         {item, placement}
       end)
@@ -1348,6 +1353,23 @@ defmodule PhoenixKitDashboards.Dashboards do
       |> Enum.map(fn {{item, _p}, p2} -> {item, p2} end)
 
     Enum.sort_by(placed ++ packed, fn {_item, p} -> {p["y"], p["x"], p["pos"]} end)
+  end
+
+  # Resolved placements are the RENDER contract ("exactly what
+  # resolve_items renders") — normalize the spans to floored integers so a
+  # legacy/tampered row storing "w"/"h" as strings can't leak type-unstable
+  # geometry to consumers (grow_on_layout's no-growth branch deliberately
+  # leaves storage untouched, so normalization must happen here). x/y are
+  # NOT coerced: their integer-ness is the placed-vs-order-only
+  # discriminator in resolve_designed's split.
+  defp normalize_span(placement) do
+    placement
+    |> then(fn p ->
+      if Map.has_key?(p, "w"), do: Map.update!(p, "w", &max(int(&1, 1), 1)), else: p
+    end)
+    |> then(fn p ->
+      if Map.has_key?(p, "h"), do: Map.update!(p, "h", &max(int(&1, 1), 1)), else: p
+    end)
   end
 
   # A widget with no stored span for this layout packs at its TYPE's default

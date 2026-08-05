@@ -459,7 +459,10 @@ defmodule PhoenixKitDashboards.DashboardsTest do
     } do
       {:ok, d} = Dashboards.add_widget(dashboard, "core.clock")
       clock = List.last(d.layout)["id"]
-      {:ok, d} = Dashboards.place_widget_grid(d, clock, "l1", 0, 0)
+      # (32, 16) — far side of the 64x36 screenful, clear of the setup
+      # note that the materialize pack seats at the origin with its full
+      # default span; placing at (0, 0) legitimately collides.
+      {:ok, d} = Dashboards.place_widget_grid(d, clock, "l1", 32, 16)
 
       # A legacy/tampered row stores "w" as a string with a valid integer
       # "h" — grow_on_layout must coerce "w" before the `p["x"] + w` bound
