@@ -53,6 +53,20 @@ defmodule PhoenixKitDashboards.Dashboards do
     repo().all(query)
   end
 
+  @doc """
+  Every SHARED (`scope == "system"`) dashboard, ordered — the pool visible to
+  all users, e.g. the project-tab link picker.
+  """
+  @spec list_system() :: [Dashboard.t()]
+  def list_system do
+    repo().all(
+      from(d in Dashboard,
+        where: d.scope == "system",
+        order_by: [asc: d.position, asc: d.inserted_at]
+      )
+    )
+  end
+
   @doc "Fetch one dashboard by uuid, or nil (nil too for a malformed id)."
   @spec get(String.t()) :: Dashboard.t() | nil
   def get(uuid) when is_binary(uuid) do

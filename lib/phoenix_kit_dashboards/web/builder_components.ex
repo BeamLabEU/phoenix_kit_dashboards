@@ -255,6 +255,11 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:active_layout, :string, required: true)
   attr(:show_grid_lines, :boolean, required: true)
   attr(:empty, :boolean, default: false)
+  # readonly renders the same fitted board with NO edit affordances (no drag/
+  # resize hooks, no card chrome) — the project-tab viewer. id_prefix keeps the
+  # fit/drag DOM ids unique when the board renders inside another page.
+  attr(:readonly, :boolean, default: false)
+  attr(:id_prefix, :string, default: "")
 
   def grid_mode(assigns) do
     entry =
@@ -279,7 +284,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       centered at natural size in a bigger one — never blown up (a bigger
       display wants its own fitted layout). DashboardGridFit owns the math. --%>
       <div
-        id="dashboard-grid-fit"
+        id={"#{@id_prefix}dashboard-grid-fit"}
         phx-hook="DashboardGridFit"
         data-design-width={@design_w}
         data-design-height={@design_h}
@@ -318,8 +323,8 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
             style={"width: #{@design_w}px; height: #{@design_h}px; transform-origin: top left; opacity: 0; animation: pk-canvas-reveal 0s 2.5s forwards;"}
           >
             <div
-              id="dashboard-grid"
-              phx-hook="DashboardGridDrag"
+              id={"#{@id_prefix}dashboard-grid"}
+              phx-hook={!@readonly && "DashboardGridDrag"}
               data-cols={@cols}
               data-max-rows={@rows}
               class="relative grid h-full w-full content-start"
@@ -333,6 +338,8 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
                 mode="grid"
                 active_layout={@active_layout}
                 cols={@cols}
+                readonly={@readonly}
+                id_prefix={@id_prefix}
               />
             </div>
           </div>
@@ -374,6 +381,8 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   # the available width. No Layout bar (a pixel canvas has no named layouts).
   attr(:dashboard, :map, required: true)
   attr(:scope, :any, required: true)
+  attr(:readonly, :boolean, default: false)
+  attr(:id_prefix, :string, default: "")
 
   def free_mode(assigns) do
     {cw, ch} = free_canvas_dims(assigns.dashboard.layout)
@@ -385,7 +394,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       (DashboardFreeFit also grows its height to at least the pane's), so there
       is no visible gap around it. --%>
       <div
-        id="dashboard-free-fit"
+        id={"#{@id_prefix}dashboard-free-fit"}
         phx-hook="DashboardFreeFit"
         class="relative flex-1 overflow-auto bg-base-200"
         style="scrollbar-gutter: stable;"
@@ -406,14 +415,21 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       </style>
       <div class="pk-free-spacer relative" style={"width: #{@cw}px; height: #{@ch}px;"}>
         <div
-          id="dashboard-free-grid"
-          phx-hook="DashboardFreeDrag"
+          id={"#{@id_prefix}dashboard-free-grid"}
+          phx-hook={!@readonly && "DashboardFreeDrag"}
           class="pk-free-canvas absolute left-0 top-0"
           style={"width: #{@cw}px; height: #{@ch}px; transform-origin: top left; opacity: 0; animation: pk-canvas-reveal 0s 2.5s forwards;"}
           data-logical-width={@cw}
           data-logical-height={@ch}
         >
-          <.widget_card :for={inst <- @dashboard.layout} inst={inst} scope={@scope} mode="free" />
+          <.widget_card
+            :for={inst <- @dashboard.layout}
+            inst={inst}
+            scope={@scope}
+            mode="free"
+            readonly={@readonly}
+            id_prefix={@id_prefix}
+          />
         </div>
       </div>
     </div>
@@ -428,6 +444,8 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:placement, :map, default: nil)
   attr(:active_layout, :string, default: nil)
   attr(:cols, :integer, default: nil)
+  attr(:readonly, :boolean, default: false)
+  attr(:id_prefix, :string, default: "")
 
   def widget_card(assigns) do
     widget = Registry.get(assigns.inst["widget_key"])
@@ -441,8 +459,8 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
 
     ~H"""
     <div
-      id={"pk-w-#{@inst["id"]}"}
-      phx-hook="DashboardResize"
+      id={"#{@id_prefix}pk-w-#{@inst["id"]}"}
+      phx-hook={!@readonly && "DashboardResize"}
       class={[
         "sortable-item group/widget relative flex flex-col overflow-hidden rounded-lg border shadow-sm",
         # The lattice is gapless — this margin IS the visual gap between cards.
@@ -466,8 +484,10 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
     >
       <%!-- The WHOLE top bar is the drag handle (the drag hooks ignore
       pointer-downs on the buttons inside it); the grip icon is just the visual
-      affordance. --%>
+      affordance. Readonly (the project-tab viewer) drops the bar entirely —
+      widgets render frameless, just their bodies. --%>
       <div
+        :if={not @readonly}
         class={[
           grip_class(@mode),
           "pk-widget-chrome flex cursor-grab touch-none select-none items-center justify-between gap-1",
@@ -546,6 +566,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         <.widget_body inst={@inst} scope={@scope} placement={@placement} />
       </div>
       <span
+        :if={not @readonly}
         class="pk-resize-handle absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none opacity-0 transition-opacity group-hover/widget:opacity-100"
         title={gettext("Drag to resize")}
       >
