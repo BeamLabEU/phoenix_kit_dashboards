@@ -76,11 +76,19 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   @impl true
   def handle_info({:dashboard_updated, %Dashboard{} = dashboard}, socket) do
     # Adopt the authoritative post-write struct; re-check the shared-scope
-    # rule (a re-scope away downgrades this pane on the spot).
+    # rule (a re-scope away downgrades this pane on the spot). mode +
+    # design_h refresh too — the render branches on them (final panel
+    # find: a stale mode rendered the wrong board component after a
+    # remote grid↔pixel change).
     {:noreply,
      socket
-     |> assign(dashboard: dashboard, state: state_for(dashboard))
-     |> assign(:active_layout, first_layout_id(dashboard))
+     |> assign(
+       dashboard: dashboard,
+       state: state_for(dashboard),
+       mode: Dashboard.layout_mode(dashboard),
+       active_layout: first_layout_id(dashboard),
+       design_h: design_height(dashboard)
+     )
      |> maybe_schedule_refresh()}
   end
 
