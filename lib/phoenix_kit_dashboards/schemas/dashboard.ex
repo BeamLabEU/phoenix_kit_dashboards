@@ -167,16 +167,21 @@ defmodule PhoenixKitDashboards.Schemas.Dashboard do
   end
 
   @doc """
-  Slugify a title (lowercase, dashes, ASCII-only), falling back to `"dashboard"`
+  Slugify a title (lowercase, dashes, romanized), falling back to `"dashboard"`
   for a blank result. The `[owner_user_uuid, slug]` pair is unique, so the context
   suffixes on collision.
+
+  Scripts core does not romanize (Greek, CJK, …) still reduce to the
+  `"dashboard"` fallback — the slug is a readability aid, not an identifier.
   """
   @spec slugify(String.t()) :: String.t()
   def slugify(title) do
     # Core's rule, not a local copy. The pipeline this replaced deleted every
-  # non-ASCII character, so a Cyrillic or Greek name produced an EMPTY slug and
-  # German lost its umlauts. Slug.slugify/2 romanizes instead.
-  case Slug.slugify(title) do
+    # non-ASCII character, so a Cyrillic name produced an EMPTY slug and German
+    # lost its umlauts. `transliterate: true` is REQUIRED — it defaults to
+    # false, and without it Slug.slugify/2 strips non-ASCII exactly like the
+    # local pipeline did, making this delegation a no-op.
+    case Slug.slugify(title, transliterate: true) do
       "" -> "dashboard"
       slug -> slug
     end

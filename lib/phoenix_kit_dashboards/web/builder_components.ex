@@ -297,8 +297,13 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
           class="pk-empty-hint pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center text-base-content/40"
         >
           <.icon name="hero-squares-plus" class="w-12 h-12" />
+          <%!-- Readonly (the project-tab viewer) has no catalog panel to point
+          at — the hint has to state the fact, not give an instruction the
+          viewer cannot follow. --%>
           <p class="mt-2">
-            {gettext("Add widgets from the panel on the right.")}
+            {if @readonly,
+              do: gettext("This dashboard has no widgets yet."),
+              else: gettext("Add widgets from the panel on the right.")}
           </p>
         </div>
         <%!-- No-JS fallback: the canvas starts hidden (the pre-fit frame must

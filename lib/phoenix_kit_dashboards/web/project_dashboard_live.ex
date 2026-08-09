@@ -232,7 +232,13 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   # core exposes it; fall back to a local resolve against older cores.
   defp assign_embed_identity(socket, session) do
     if is_nil(socket.assigns[:phoenix_kit_current_scope]) do
-      if function_exported?(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, 2) do
+      # ensure_loaded? before function_exported?: on a cold VM the module may
+      # not be loaded yet and function_exported?/3 answers false WITHOUT
+      # loading it — silently taking the legacy fallback against a core that
+      # does export the canonical helper. (Same trap as Registry's provider
+      # discovery.)
+      if Code.ensure_loaded?(PhoenixKitWeb.Users.Auth) and
+           function_exported?(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, 2) do
         # credo:disable-for-next-line Credo.Check.Refactor.Apply
         apply(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, [socket, session])
       else

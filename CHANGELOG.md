@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] - 2026-08-09
+
+### Added
+
+- **Read-only project-tab viewer** (`Web.ProjectDashboardLive`): this module is
+  now a *project-extension provider* for the `phoenix_kit_projects` hub via the
+  duck-typed `phoenix_kit_project_extensions/0` (plain maps — neither package
+  depends on the other). A project links ONE shared dashboard and renders it live
+  and read-only as a project tab, with an explanatory card for the
+  unconfigured / missing / not-shared states.
+- `Dashboards.list_system/0` and `PhoenixKitDashboards.project_dashboard_options/0`
+  — the shared-dashboard pool behind the project's link picker.
+- `readonly` + `id_prefix` attributes on `BuilderComponents.grid_mode/1`,
+  `free_mode/1` and `widget_card/1`: the same fitted board with no drag/resize
+  hooks and no card chrome, and unique DOM ids when it renders inside another page.
+
+### Changed
+
+- `Schemas.Dashboard.slugify/1` now delegates to core's `PhoenixKit.Utils.Slug`
+  **with `transliterate: true`** instead of a local ASCII-only pipeline. A
+  Cyrillic title used to strip to an empty slug — which callers read as "no slug
+  yet" and regenerate on every save — and Latin diacritics lost their base
+  letters. `"Видеопродакшн"` → `"videoprodakshn"`, `"Übung Café"` →
+  `"ubung-cafe"`. Scripts core does not romanize (Greek, CJK) still reduce to the
+  `"dashboard"` fallback; the slug is a readability aid, not an identifier.
+
+### Fixed
+
+- Provider discovery dropped widgets on a cold VM: `function_exported?/3` returns
+  `false` for a module that has not been loaded yet *without loading it*, so a
+  discovered provider's widgets were silently missing from the catalogue until
+  something else happened to touch the module. `Registry` and the project tab's
+  embed-identity resolution now both `Code.ensure_loaded?/1` first.
+- `Dashboards.resolve_items/3` could leak string `"w"`/`"h"` spans from a
+  legacy/tampered row into the render contract; spans are now floored to
+  integers at resolution (`x`/`y` deliberately left uncoerced — their
+  integer-ness is the placed-vs-order-only discriminator).
+- The empty-board hint told read-only viewers to "Add widgets from the panel on
+  the right" — a panel the project tab does not have.
+
 ## [0.2.2] - 2026-07-19
 
 ### Fixed
