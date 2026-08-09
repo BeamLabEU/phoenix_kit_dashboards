@@ -189,4 +189,59 @@ defmodule PhoenixKitDashboards do
   """
   @spec phoenix_kit_widgets() :: [map()]
   def phoenix_kit_widgets, do: PhoenixKitDashboards.Widgets.builtin()
+
+  # ── Project-extension provider ─────────────────────────────────────
+
+  @doc """
+  Project-extension catalog entry for the `phoenix_kit_projects` hub —
+  duck-typed contract (no dependency on that package, no `@impl`): a
+  read-only **Dashboard** tab rendering one linked SHARED dashboard
+  (`config["dashboard_uuid"]`, picked from `project_dashboard_options/0`).
+  """
+  @spec phoenix_kit_project_extensions() :: [map()]
+  def phoenix_kit_project_extensions do
+    [
+      %{
+        key: "dashboards_board",
+        name: "Dashboard",
+        description: "Show a shared dashboard as a tab on this project",
+        icon: "hero-squares-2x2",
+        module_key: @module_key,
+        default_enabled: false,
+        tabs: [
+          %{
+            key: "dashboard",
+            label: "Dashboard",
+            icon: "hero-squares-2x2",
+            lv: PhoenixKitDashboards.Web.ProjectDashboardLive
+          }
+        ],
+        config_schema: [
+          %{
+            key: "dashboard_uuid",
+            type: :select,
+            label: "Shared dashboard",
+            options: {__MODULE__, :project_dashboard_options}
+          }
+        ],
+        permission_actions: [:view]
+      }
+    ]
+  end
+
+  @doc """
+  Options for the project-extension config picker: every SHARED
+  (`scope == "system"`) dashboard, as `%{value:, label:}` — the only scope
+  a project-wide tab may render (personal/role dashboards carry per-user
+  visibility). `[]` when the table is unavailable.
+  """
+  @spec project_dashboard_options() :: [%{value: String.t(), label: String.t()}]
+  def project_dashboard_options do
+    PhoenixKitDashboards.Dashboards.list_system()
+    |> Enum.map(&%{value: &1.uuid, label: &1.title})
+  rescue
+    _ -> []
+  catch
+    :exit, _ -> []
+  end
 end

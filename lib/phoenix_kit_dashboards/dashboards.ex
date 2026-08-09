@@ -53,6 +53,20 @@ defmodule PhoenixKitDashboards.Dashboards do
     repo().all(query)
   end
 
+  @doc """
+  Every SHARED (`scope == "system"`) dashboard, ordered — the pool visible to
+  all users, e.g. the project-tab link picker.
+  """
+  @spec list_system() :: [Dashboard.t()]
+  def list_system do
+    repo().all(
+      from(d in Dashboard,
+        where: d.scope == "system",
+        order_by: [asc: d.position, asc: d.inserted_at]
+      )
+    )
+  end
+
   @doc "Fetch one dashboard by uuid, or nil (nil too for a malformed id)."
   @spec get(String.t()) :: Dashboard.t() | nil
   def get(uuid) when is_binary(uuid) do
@@ -1332,6 +1346,7 @@ defmodule PhoenixKitDashboards.Dashboards do
           |> Layout.placement(layout_id)
           |> Map.put_new("pos", idx)
           |> default_span(item, layout_id)
+          |> normalize_span()
 
         {item, placement}
       end)
@@ -1351,6 +1366,23 @@ defmodule PhoenixKitDashboards.Dashboards do
       |> Enum.map(fn {{item, _p}, p2} -> {item, p2} end)
 
     Enum.sort_by(placed ++ packed, fn {_item, p} -> {p["y"], p["x"], p["pos"]} end)
+  end
+
+  # Resolved placements are the RENDER contract ("exactly what
+  # resolve_items renders") — normalize the spans to floored integers so a
+  # legacy/tampered row storing "w"/"h" as strings can't leak type-unstable
+  # geometry to consumers (grow_on_layout's no-growth branch deliberately
+  # leaves storage untouched, so normalization must happen here). x/y are
+  # NOT coerced: their integer-ness is the placed-vs-order-only
+  # discriminator in resolve_designed's split.
+  defp normalize_span(placement) do
+    placement
+    |> then(fn p ->
+      if Map.has_key?(p, "w"), do: Map.update!(p, "w", &max(int(&1, 1), 1)), else: p
+    end)
+    |> then(fn p ->
+      if Map.has_key?(p, "h"), do: Map.update!(p, "h", &max(int(&1, 1), 1)), else: p
+    end)
   end
 
   # A widget with no stored span for this layout packs at its TYPE's default
