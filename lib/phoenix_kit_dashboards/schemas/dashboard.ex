@@ -36,6 +36,8 @@ defmodule PhoenixKitDashboards.Schemas.Dashboard do
 
   import Ecto.Changeset
 
+  alias PhoenixKit.Utils.Slug
+
   @primary_key {:uuid, UUIDv7, autogenerate: true}
   @foreign_key_type :binary_id
 
@@ -171,12 +173,10 @@ defmodule PhoenixKitDashboards.Schemas.Dashboard do
   """
   @spec slugify(String.t()) :: String.t()
   def slugify(title) do
-    title
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9\s-]/u, "")
-    |> String.replace(~r/[\s_]+/, "-")
-    |> String.trim("-")
-    |> case do
+    # Core's rule, not a local copy. The pipeline this replaced deleted every
+  # non-ASCII character, so a Cyrillic or Greek name produced an EMPTY slug and
+  # German lost its umlauts. Slug.slugify/2 romanizes instead.
+  case Slug.slugify(title) do
       "" -> "dashboard"
       slug -> slug
     end
