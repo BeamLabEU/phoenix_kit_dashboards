@@ -267,8 +267,10 @@ system / role scopes, JSONB `layout`, `owner_user_uuid` FK → `phoenix_kit_user
 
 The per-dashboard JSONB **`config`** column (type + named layouts) ships as core
 migration **V139**, released in core **`1.7.179`**. The config-dependent features
-(type, named layouts) need that column, so the `mix.exs` core pin
-floor is `~> 1.7.179` — a core older than that would resolve an older pin yet lack
+(type, named layouts) need that column. The `mix.exs` core pin
+floor is `~> 1.7.189` (the release shipping `PhoenixKit.SchemaPrefix`, applied to
+every table-backed schema here) — and it can't go below `1.7.179` regardless:
+a core older than that would resolve an older pin yet lack
 the column the layout engine reads. Cross-repo work can still run against
 **local core** (`PHOENIX_KIT_PATH=../phoenix_kit`), where `ensure_current` builds
 the migration; standalone `mix test` needs a core `>= 1.7.179` for the

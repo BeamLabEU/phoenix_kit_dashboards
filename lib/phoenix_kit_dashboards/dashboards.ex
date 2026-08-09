@@ -514,10 +514,9 @@ defmodule PhoenixKitDashboards.Dashboards do
       layout =
         Enum.map(dashboard.layout, fn
           %{"id" => ^instance_id} = inst ->
-            # Write the COERCED h too: a legacy/tampered row storing "h" as
-            # a string would otherwise survive the placement merge and keep
-            # tripping integer pattern-matches downstream — placing a widget
-            # heals its geometry.
+            # Persist the coerced h too (like resize_instance/grow_on_layout
+            # do) — healing a legacy/tampered string span, not just reading
+            # past it on every render.
             Layout.put_placement(inst, layout_id, %{"x" => x, "y" => y, "w" => w, "h" => h})
 
           inst ->

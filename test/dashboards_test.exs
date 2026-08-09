@@ -459,10 +459,11 @@ defmodule PhoenixKitDashboards.DashboardsTest do
     } do
       {:ok, d} = Dashboards.add_widget(dashboard, "core.clock")
       clock = List.last(d.layout)["id"]
-      # (32, 16) — far side of the 64x36 screenful, clear of the setup
-      # note that the materialize pack seats at the origin with its full
-      # default span; placing at (0, 0) legitimately collides.
-      {:ok, d} = Dashboards.place_widget_grid(d, clock, "l1", 32, 16)
+      # Park the clock clear of the setup note ((0,0) 16x8) and shrink it to
+      # the normal view's floor so the analog switch genuinely grows the
+      # height (at the default 12x8 the no-op guard would skip growth).
+      {:ok, d} = Dashboards.place_widget_grid(d, clock, "l1", 20, 0)
+      {:ok, d} = Dashboards.resize_widget(d, clock, "l1", 12, 4)
 
       # A legacy/tampered row stores "w" as a string with a valid integer
       # "h" — grow_on_layout must coerce "w" before the `p["x"] + w` bound

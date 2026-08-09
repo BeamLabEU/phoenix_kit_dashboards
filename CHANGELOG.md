@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-07-19
+
+### Fixed
+
+- `Dashboards.place_at_cell/5` (a grid drag-to-cell drop) coerced a
+  legacy/tampered string `"h"` only for its row-bound clamp but persisted just
+  `x`/`y`/`w`, so the string span survived every drag. It now persists the
+  coerced `"h"` too (matching `resize_instance/7` / `grow_on_layout/5`), healing
+  the stored placement.
+- Both regression tests added in 0.2.1 for the legacy-span coercion fixes were
+  committed unverified (no PostgreSQL in the review environment) and failed
+  against a real DB: the `place_widget_grid/5` one via the persistence gap
+  above, the view-switch-growth one via a setup that placed the clock on an
+  occupied cell and couldn't trigger growth. The latter was redesigned to
+  actually reach the guarded path and pin the `ArithmeticError`.
+- `mix.exs` `source_ref` pointed ExDoc source links at non-existent
+  `v`-prefixed tags; the repo tags bare version numbers. Corrected, along with
+  the stale core-pin floor comments in `mix.exs`/`AGENTS.md` (the floor has
+  been `~> 1.7.189` since `PhoenixKit.SchemaPrefix`).
+
 ## [0.2.1] - 2026-07-18
 
 ### Changed
