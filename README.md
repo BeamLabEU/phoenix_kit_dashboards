@@ -27,7 +27,7 @@ and per system/role (shared).
 Add to your PhoenixKit host app's `mix.exs`:
 
 ```elixir
-{:phoenix_kit_dashboards, "~> 0.1"}
+{:phoenix_kit_dashboards, "~> 0.3"}
 ```
 
 Run `mix deps.get`, then apply core's migrations with `mix phoenix_kit.update`.

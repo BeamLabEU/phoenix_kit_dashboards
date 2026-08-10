@@ -1,7 +1,7 @@
 defmodule PhoenixKitDashboards.MixProject do
   use Mix.Project
 
-  @version "0.2.3"
+  @version "0.3.0"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_dashboards"
 
   def project do
@@ -83,7 +83,7 @@ defmodule PhoenixKitDashboards.MixProject do
       # named layouts), and V133 (1.7.145) created the phoenix_kit_dashboards
       # table; an older 1.7.x would resolve an older pin yet lack the `config`
       # column the layout engine reads.
-      pk_dep(:phoenix_kit, "~> 1.7.189"),
+      pk_dep(:phoenix_kit, "~> 2.0"),
 
       # LiveView powers the dashboard builder and the widget LiveComponents.
       {:phoenix_live_view, "~> 1.1"},
