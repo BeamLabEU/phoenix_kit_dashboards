@@ -11,6 +11,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
   are injected by PhoenixKit's on_mount hooks.
   """
   use PhoenixKitWeb, :live_view
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   require Logger
 

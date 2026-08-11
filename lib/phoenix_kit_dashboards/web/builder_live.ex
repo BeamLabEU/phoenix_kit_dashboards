@@ -43,6 +43,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   guarded so a hostile/malformed event can't crash or brick the builder.
   """
   use PhoenixKitWeb, :live_view
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   require Logger
 

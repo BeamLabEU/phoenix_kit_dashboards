@@ -11,6 +11,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   Widgets and placement are edited in the builder, not here.
   """
   use PhoenixKitWeb, :live_view
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   require Logger
 

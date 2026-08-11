@@ -6,7 +6,7 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   context mutations that accept a trailing `opts \\ []` (for activity logging).
   """
 
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   alias PhoenixKit.Users.Roles
   alias PhoenixKitDashboards.Dashboards
@@ -15,6 +15,13 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   Dynamic translation for catalog DATA (widget names, descriptions, view names,
   settings labels — plain strings from the provider contract). Falls back to
   the input when no translation exists, so provider strings pass through.
+
+  Routes through THIS module's own backend: the built-in widgets' catalog
+  strings are pinned as msgids via `Widgets.__catalog_strings__/0`
+  (`gettext_noop/1` — `mix gettext.extract` can't see a literal passed through
+  a variable, so that anchor is what keeps them in the `.pot`). A widget
+  contributed by another module (a foreign `name`/`description`) simply passes
+  through unchanged unless that exact string happens to also be a msgid here.
   """
   @spec translate_catalog(String.t() | nil) :: String.t() | nil
   def translate_catalog(nil), do: nil
@@ -22,7 +29,7 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   def translate_catalog(string) when is_binary(string) do
     # Runtime translation of a dynamic value — the `gettext/1` macro needs a
     # literal, so this stays the explicit runtime-function form.
-    Gettext.gettext(PhoenixKitWeb.Gettext, string)
+    Gettext.gettext(PhoenixKitDashboards.Gettext, string)
   end
 
   @doc "Translated label for a dashboard scope enum value."

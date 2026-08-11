@@ -31,7 +31,7 @@ defmodule PhoenixKitDashboards.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :phoenix_kit]
+      extra_applications: [:logger, :gettext, :phoenix_kit]
     ]
   end
 
@@ -84,6 +84,10 @@ defmodule PhoenixKitDashboards.MixProject do
       # table; an older 1.7.x would resolve an older pin yet lack the `config`
       # column the layout engine reads.
       pk_dep(:phoenix_kit, "~> 2.0"),
+
+      # Per-module i18n — own Gettext backend for the sidebar tab labels and
+      # this module's own UI strings (see `PhoenixKitDashboards.Gettext`).
+      {:gettext, "~> 1.0"},
 
       # LiveView powers the dashboard builder and the widget LiveComponents.
       {:phoenix_live_view, "~> 1.1"},

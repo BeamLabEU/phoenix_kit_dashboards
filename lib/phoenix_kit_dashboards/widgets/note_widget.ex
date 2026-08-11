@@ -27,7 +27,7 @@ defmodule PhoenixKitDashboards.Widgets.NoteWidget do
   it on that cadence — the widget never subscribes/times itself.
   """
   use Phoenix.LiveComponent
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   import PhoenixKitWeb.Components.Core.Markdown, only: [markdown: 1]
 
