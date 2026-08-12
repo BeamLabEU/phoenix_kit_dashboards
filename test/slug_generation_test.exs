@@ -8,6 +8,11 @@ defmodule PhoenixKitDashboards.SlugGenerationTest do
   because callers read it as "no slug yet" and regenerate on every save.
 
   These are the assertions that would fail if the change were reverted.
+
+  Core has since moved the rule into the `locale_slug` package and made
+  romanization unconditional (`:transliterate` is accepted and ignored), which
+  widened what romanizes — Greek now does — and changed one Cyrillic mapping
+  (`є` → `ye`, not `ie`). The expectations below track core's current output.
   """
   use ExUnit.Case, async: true
 
@@ -16,29 +21,50 @@ defmodule PhoenixKitDashboards.SlugGenerationTest do
 
   test "a Cyrillic title gets a real slug instead of the 'dashboard' fallback" do
     assert Dashboard.slugify("Видеопродакшн") == "videoprodakshn"
-    assert Dashboard.slugify("Проєкт Огляд") == "proiekt-oglyad"
+    assert Dashboard.slugify("Проєкт Огляд") == "proyekt-oglyad"
   end
 
   test "Latin diacritics survive as their base letters" do
     assert Dashboard.slugify("Übung Café") == "ubung-cafe"
   end
 
-  # The `transliterate: true` option is what makes the two tests above pass —
-  # it defaults to FALSE, and the first cut of this change omitted it, so the
-  # delegation to core was a no-op and every Cyrillic title still slugged to
-  # "dashboard". Keep this assertion: it is the one that fails if the option
-  # is dropped again.
-  test "core's default (no transliteration) is NOT what we call" do
-    assert Slug.slugify("Видеопродакшн") == ""
-    assert Dashboard.slugify("Видеопродакшн") != "dashboard"
+  test "Greek romanizes too" do
+    assert Dashboard.slugify("Καλημέρα") == "kalimera"
+  end
+
+  # This used to assert `Slug.slugify("Видеопродакшн") == ""` — that core's
+  # default was NOT to transliterate, which is what made passing
+  # `transliterate: true` the load-bearing part of the delegation.
+  #
+  # Core removed that distinction: `PhoenixKit.Utils.Slug` moved its rule into
+  # the `locale_slug` package and made romanization unconditional, documenting
+  # `:transliterate` as accepted-and-ignored for source compatibility. So the
+  # old assertion cannot hold, and no option choice here can bring the empty
+  # slug back.
+  #
+  # What is still worth guarding is that this module *delegates* rather than
+  # growing its own ASCII-only pipeline again — the regression that produced
+  # empty slugs for Cyrillic titles, which callers read as "no slug yet" and
+  # regenerated on every save.
+  test "slugify delegates to core rather than reimplementing" do
+    for title <- ["Видеопродакшн", "Проєкт Огляд", "Καλημέρα", "Übung Café"] do
+      assert Dashboard.slugify(title) == Slug.slugify(title)
+      refute Dashboard.slugify(title) == "dashboard"
+    end
   end
 
   test "the fallback covers content-less titles and un-romanized scripts" do
     assert Dashboard.slugify("!!!") == "dashboard"
     assert Dashboard.slugify("") == "dashboard"
-    # Core romanizes Cyrillic + Latin diacritics only; Greek/CJK reduce to the
-    # fallback. Documented, not aspirational.
-    assert Dashboard.slugify("Καλημέρα") == "dashboard"
+
+    # Core romanizes Cyrillic, Greek and Latin diacritics; CJK still has no
+    # romanization and yields "" from core, which is what the fallback is for.
+    # Documented, not aspirational — core's `fallback: :empty` is deliberate,
+    # so that an unromanizable script never emits native script into a path
+    # this codebase assumes is ASCII.
+    assert Slug.slugify("日本語のダッシュボード") == ""
+    assert Dashboard.slugify("日本語のダッシュボード") == "dashboard"
+    assert Dashboard.slugify("中文") == "dashboard"
   end
 
   test "plain ASCII is unchanged" do

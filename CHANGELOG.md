@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.0 - 2026-08-12
+
+### Added
+
+- **Per-module Gettext i18n (en/et/ru)** (#7). This package now owns a
+  `PhoenixKitDashboards.Gettext` backend and its own catalogues under
+  `priv/gettext/` (125 msgids per locale). Previously every `gettext` call here
+  resolved against core's `PhoenixKitWeb.Gettext`, so the builder, widget
+  catalog and sidebar rendered in English whatever the locale, with nowhere to
+  add translations for this package. Tab and permission-matrix labels are wired
+  through `gettext_backend`/`gettext_domain`, and `translatable_labels/0`
+  anchors the four tab labels — declared as plain struct literals that
+  `mix gettext.extract` cannot see — so `mix gettext.merge` stops deleting
+  them.
+
+  `Web.Helpers.translate_catalog/1` now routes widget catalog data through this
+  module's backend as well; the built-in widgets' strings stay anchored by
+  `Widgets.__catalog_strings__/0`, and a widget contributed by another module
+  passes through unchanged as before.
+- **`PGDATABASE` / `PGPOOL` overrides for the test suite** (#8).
+  `config/test.exs` reads both from the environment, falling back to the
+  previous hardcoded database name and `System.schedulers_online() * 2`.
+  Without them the only way to run the `:integration` half of the suite was a
+  Postgres role holding `CREATEDB`, which shared and managed instances
+  withhold. CI and local runs are unaffected.
+
+### Fixed
+
+- **Dialyzer failed on the new Gettext backend.** Gettext 1.0 + Expo 1.1
+  generate a `Gettext.Plural.plural/2` call against Expo's opaque
+  `PluralForms` struct inside `use Gettext.Backend`, reported as
+  `call_without_opaque`. Added the narrowly-scoped `.dialyzer_ignore.exs` that
+  the other `phoenix_kit_*` packages with their own backend already carry, and
+  wired `ignore_warnings:` in `mix.exs`.
+- **Three slug tests asserted a core contract that no longer exists.** Core's
+  `PhoenixKit.Utils.Slug` moved its rule into the `locale_slug` package and
+  made romanization unconditional, documenting `:transliterate` as
+  accepted-and-ignored. Greek now romanizes (`Καλημέρα` → `kalimera`) instead
+  of falling back, `є` maps to `ye` rather than `ie`, and core's un-optioned
+  default no longer returns `""` for Cyrillic. The expectations now track
+  core's actual output, the fallback case uses CJK (which still has no
+  romanization), and the guard that mattered — that this module delegates to
+  core instead of regrowing its own ASCII-only pipeline — is asserted directly.
+  These predated this release; `mix precommit` here runs no tests, so they went
+  unnoticed.
+
+### Changed
+
+- Dependency updates: `phoenix` 1.8.11, `beamlab_ex_aws_sqs` 5.0.1, `hackney`
+  4.7.4 and the transitive set.
+
 ## 0.3.1 - 2026-08-11
 
 ### Changed

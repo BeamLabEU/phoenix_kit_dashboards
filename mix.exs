@@ -1,7 +1,7 @@
 defmodule PhoenixKitDashboards.MixProject do
   use Mix.Project
 
-  @version "0.3.1"
+  @version "0.4.0"
   @source_url "https://github.com/BeamLabEU/phoenix_kit_dashboards"
 
   def project do
@@ -20,7 +20,7 @@ defmodule PhoenixKitDashboards.MixProject do
       package: package(),
 
       # Dialyzer
-      dialyzer: [plt_add_apps: [:phoenix_kit]],
+      dialyzer: [plt_add_apps: [:phoenix_kit], ignore_warnings: ".dialyzer_ignore.exs"],
 
       # Docs
       name: "PhoenixKitDashboards",
