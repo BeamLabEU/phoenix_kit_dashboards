@@ -286,6 +286,24 @@ createdb phoenix_kit_dashboards_test          # first time (or: mix test.setup)
 PHOENIX_KIT_PATH=../phoenix_kit mix test      # vs local core (see below)
 ```
 
+`database:` / `pool_size:` in `config/test.exs` read `PGDATABASE` /
+`PGPOOL` instead, falling back to the hardcoded name above and
+`System.schedulers_online() * 2` when unset — same mechanism core
+`phoenix_kit`'s `config/test.exs` uses. Set both to point this suite
+at a database it doesn't own and can't `CREATEDB` for itself, e.g. a
+shared instance also used by sibling `phoenix_kit_*` modules:
+
+```bash
+PGDATABASE=migration_test_db PGPOOL=6 mix test
+```
+
+**Caution:** this composes dangerously with the `PHOENIX_KIT_PATH` line
+above. If `PGDATABASE` points at a database other modules also use,
+don't combine it with a local core checkout — the `ensure_current/2`
+call below would then run *that* core's migration chain against the
+shared database, moving its schema for every other module pointed at
+the same `PGDATABASE`, not just this suite.
+
 Without PostgreSQL, integration tests auto-exclude and unit tests still run.
 `test/test_helper.exs` builds the schema via
 `PhoenixKit.Migration.ensure_current/2` (no module-owned DDL) and starts the test
