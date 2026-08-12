@@ -27,8 +27,6 @@ providers stay decoupled:
   `phoenix_kit_dashboards` table and its `config` column ship as **core**
   migrations (`V133` / `V139`), and DB access goes through
   `PhoenixKit.RepoHelper.repo/0`. This module owns no Ecto repo and no DDL.
-- **No gettext backend or `priv/gettext`** — user-facing strings route to
-  core's `PhoenixKitWeb.Gettext` (the standard for a small module).
 - **No `route_module/0`** — the list page and the per-dashboard builder are
   both `admin_tabs/0` entries with `live_view:` set (single-page pattern); no
   locale-prefixed route variants.
@@ -82,9 +80,20 @@ providers stay decoupled:
   logs via `PhoenixKit.Activity.log/1`, guarded with `Code.ensure_loaded?/1` +
   rescued so a logging failure never crashes the mutation. LiveViews pass
   `Web.Helpers.actor_opts/1`.
-- **Gettext** — user-facing strings route to core's `PhoenixKitWeb.Gettext`
-  (`Gettext.gettext(PhoenixKitWeb.Gettext, "...")`). This module ships no backend
-  or `priv/gettext` — the standard for a small module.
+- **Gettext** — this module ships its **own** backend (`PhoenixKitDashboards.Gettext`,
+  `priv/gettext/{en,et,ru}`), like `phoenix_kit_crm`/`_warehouse`/`_manufacturing`.
+  Every LiveView/component `use Gettext, backend: PhoenixKitDashboards.Gettext`
+  (added explicitly even where `use PhoenixKitWeb, :live_view`/`:html` would
+  otherwise pull in core's backend — the later `use Gettext` shadows it).
+  `Web.Helpers.translate_catalog/1` is the runtime path for catalog DATA
+  (widget names/descriptions/view names/settings labels — plain strings from
+  the provider contract, `Gettext.gettext(PhoenixKitDashboards.Gettext, string)`);
+  since `mix gettext.extract` can't see a literal behind a variable, the
+  built-ins' own catalog strings are pinned via `Widgets.__catalog_strings__/0`
+  (`gettext_noop/1` calls). `admin_tabs/0` and `permission_metadata/0` labels
+  hit the same trap for the same reason (`Tab.localized_label/1` /
+  `Permissions.localized_module_label/1` call `dgettext/3` at render time with
+  a variable) — `translatable_labels/0` pins those via `dgettext_noop/2`.
 - **Form components** — use core `PhoenixKitWeb.Components.Core.{Input, Select,
   Textarea, Checkbox}` (`<.input>` / `<.select>` / `<.textarea>` / `<.checkbox>`),
   which render the daisyUI 5 `<label class="select">` wrapper. Never put the
@@ -313,6 +322,12 @@ Endpoint. Support harness in `test/support/`: `Test.Repo`, `Test.Endpoint`,
 because `BuilderLive` reads it strictly), `DataCase`, `LiveCase` (`fake_scope/1` +
 `put_test_scope/2` + `fixture_dashboard/2`), `Fixtures` (`user_fixture/1` — a real
 `phoenix_kit_users` row is required for the owner FK), `ActivityLogAssertions`.
+
+`test/i18n_test.exs` is a smoke test for the per-module i18n wiring (see
+"Gettext" above and `/www/phoenix_kit/guides/per-module-i18n.md`) — tagged
+`:requires_phoenix_kit_i18n_api`, excluded by `test/test_helper.exs` only if
+`phoenix_kit` ever resolves below the release that shipped `gettext_backend:`
+(this module's floor already postdates it).
 
 ## Local cross-repo development
 

@@ -12,7 +12,7 @@ defmodule PhoenixKitDashboards.Widgets.ModuleStatsWidget do
   SELECT (`module_options/0`) — nobody should have to know registry keys.
   """
   use Phoenix.LiveComponent
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   alias PhoenixKit.Users.Auth.Scope
 

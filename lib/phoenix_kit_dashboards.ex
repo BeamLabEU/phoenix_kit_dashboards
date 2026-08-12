@@ -38,6 +38,7 @@ defmodule PhoenixKitDashboards do
   """
 
   use PhoenixKit.Module
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Settings
@@ -91,7 +92,11 @@ defmodule PhoenixKitDashboards do
       key: @module_key,
       label: "Dashboards",
       icon: "hero-squares-2x2",
-      description: "Build custom dashboard pages from widgets exposed by any module"
+      description: "Build custom dashboard pages from widgets exposed by any module",
+      # Renders the label translated in the admin permissions matrix, the same
+      # way the sidebar tabs below translate theirs.
+      gettext_backend: PhoenixKitDashboards.Gettext,
+      gettext_domain: "default"
     }
   end
 
@@ -101,6 +106,8 @@ defmodule PhoenixKitDashboards do
       %Tab{
         id: :admin_dashboards,
         label: "Dashboards",
+        gettext_backend: PhoenixKitDashboards.Gettext,
+        gettext_domain: "default",
         icon: "hero-squares-2x2",
         path: "dashboards",
         priority: 650,
@@ -116,6 +123,8 @@ defmodule PhoenixKitDashboards do
       %Tab{
         id: :admin_dashboards_new,
         label: "New Dashboard",
+        gettext_backend: PhoenixKitDashboards.Gettext,
+        gettext_domain: "default",
         path: "dashboards/new",
         priority: 651,
         level: :admin,
@@ -127,6 +136,8 @@ defmodule PhoenixKitDashboards do
       %Tab{
         id: :admin_dashboards_edit,
         label: "Dashboard Settings",
+        gettext_backend: PhoenixKitDashboards.Gettext,
+        gettext_domain: "default",
         path: "dashboards/:uuid/edit",
         priority: 652,
         level: :admin,
@@ -140,6 +151,8 @@ defmodule PhoenixKitDashboards do
       %Tab{
         id: :admin_dashboards_builder,
         label: "Dashboard Builder",
+        gettext_backend: PhoenixKitDashboards.Gettext,
+        gettext_domain: "default",
         path: "dashboards/:uuid",
         priority: 653,
         level: :admin,
@@ -148,6 +161,35 @@ defmodule PhoenixKitDashboards do
         visible: false,
         live_view: {PhoenixKitDashboards.Web.BuilderLive, :edit}
       }
+    ]
+  end
+
+  @doc """
+  Pins every label this module declares as a gettext msgid.
+
+  `permission_metadata/0` and `admin_tabs/0` declare their labels as plain
+  string literals, so `mix gettext.extract` never sees this file —
+  `PhoenixKit.Dashboard.Tab.localized_label/1` (and the permissions matrix'
+  `PhoenixKit.Users.Permissions.localized_module_label/1`) translate them at
+  render time through each declaration's `gettext_backend`/`gettext_domain`,
+  but only if the msgid already exists in this module's own catalogue.
+
+  Without this anchor, "Dashboards" happens to also appear as a literal
+  `gettext("Dashboards")` call in `Web.DashboardsLive`'s page title — so it
+  would stay in `default.pot` today, but only by coincidence (see
+  `phoenix_kit_warehouse`'s `translatable_labels/0`, which hit exactly this
+  trap). The other three tab labels have no such coincidental anchor at all.
+
+  `dgettext_noop/2` registers the msgid and returns it unchanged — nothing
+  here runs at request time.
+  """
+  @spec translatable_labels() :: [String.t()]
+  def translatable_labels do
+    [
+      dgettext_noop("default", "Dashboards"),
+      dgettext_noop("default", "New Dashboard"),
+      dgettext_noop("default", "Dashboard Settings"),
+      dgettext_noop("default", "Dashboard Builder")
     ]
   end
 

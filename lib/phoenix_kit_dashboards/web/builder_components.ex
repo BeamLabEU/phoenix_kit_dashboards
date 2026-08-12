@@ -12,6 +12,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   mutual import).
   """
   use PhoenixKitWeb, :html
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   import PhoenixKitDashboards.Web.Helpers, only: [translate_catalog: 1]
 

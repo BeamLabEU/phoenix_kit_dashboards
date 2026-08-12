@@ -8,7 +8,7 @@ defmodule PhoenixKitDashboards.Widgets do
   are also a worked reference for module authors.
   """
 
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   alias PhoenixKitDashboards.Widgets.ClockWidget
   alias PhoenixKitDashboards.Widgets.ModuleStatsWidget

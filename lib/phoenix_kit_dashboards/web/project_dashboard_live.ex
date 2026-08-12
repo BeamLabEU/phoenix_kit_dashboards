@@ -36,7 +36,7 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   # Plain LiveView, NOT `use PhoenixKitWeb, :live_view` — an embedded tab
   # must not pull the admin layout in (the ProjectDocumentsLive precedent).
   use Phoenix.LiveView
-  use Gettext, backend: PhoenixKitWeb.Gettext
+  use Gettext, backend: PhoenixKitDashboards.Gettext
 
   import PhoenixKitDashboards.Web.BuilderComponents,
     only: [grid_mode: 1, free_mode: 1, pixel_cells: 1]
