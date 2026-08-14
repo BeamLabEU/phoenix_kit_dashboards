@@ -892,7 +892,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
             options={Enum.map(@widget.views, fn v -> {translate_catalog(v.name), v.key} end)}
           />
           <div :if={@widget}>
-            <span class="label-text text-sm">
+            <span class="fieldset-legend text-sm">
               {if @free?,
                 do: gettext("Size & position (px)"),
                 else: gettext("Size")}
