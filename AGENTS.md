@@ -62,6 +62,12 @@ PHOENIX_KIT_PATH=../phoenix_kit mix deps.get && PHOENIX_KIT_PATH=../phoenix_kit 
 test.reset` drops and recreates it. Both need `MIX_ENV=test`: `Test.Repo` is
 compiled only in that environment, so the alias fails with `:nofile` in `dev`.
 
+Repo-local aliases:
+
+- `mix quality` — `format` + `credo --strict` + `dialyzer` (applies formatting).
+- `mix quality.ci` — `format --check-formatted` + `credo --strict` + `dialyzer`: it CHECKS formatting rather than applying it, so run `mix format` first.
+- `mix test.reset` — drops the test database and recreates it.
+
 ## Conventions
 
 - **Module key** `"dashboards"`, used identically in every callback, the
