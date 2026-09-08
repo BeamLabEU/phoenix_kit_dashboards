@@ -1,402 +1,369 @@
 # AGENTS.md
 
-This file provides guidance to AI agents working in this repository.
+Guidance for AI agents working on `phoenix_kit_dashboards`.
 
-## Project Overview
+## Overview
 
-`phoenix_kit_dashboards` is a PhoenixKit module that lets users build custom
-dashboard pages from **widgets** exposed by any PhoenixKit module. It implements
-the `PhoenixKit.Module` behaviour for zero-config auto-discovery.
+`phoenix_kit_dashboards` lets users build dashboard pages out of **widgets**
+contributed by any PhoenixKit module. It implements the `PhoenixKit.Module`
+behaviour for zero-config auto-discovery. A widget *type* is a plain map a
+provider returns from `phoenix_kit_widgets/0`; a dashboard is a user-owned 2D
+canvas of placed widget *instances*, persisted as a JSONB `layout` list, scoped
+personal / system / role.
 
-Two core ideas:
+- **Depends on:** `phoenix_kit` `~> 2.0` (Hex). No sibling `phoenix_kit_*` deps —
+  the widget contract is duck-typed, so a provider is never a dependency.
+- **Consumed by:** nothing. The dependency arrow points one way (a provider
+  exposes `phoenix_kit_widgets/0`; this module discovers it at runtime).
+  `phoenix_kit_projects` additionally consumes the duck-typed
+  `phoenix_kit_project_extensions/0` entry this module exports.
+- **Admin surface:** one visible tab **Dashboards** (`/admin/dashboards`,
+  priority 650, group `:admin_modules`) plus three hidden tabs —
+  `dashboards/new`, `dashboards/:uuid/edit` (form) and `dashboards/:uuid`
+  (builder).
+- **Module key** `"dashboards"`; settings prefix `dashboards_` (only
+  `dashboards_enabled` today).
 
-1. **Widget provider contract** — any module exposes widget *types* by defining
-   `phoenix_kit_widgets/0` returning plain maps. Providers do **not** depend on
-   this package; the dependency arrow points one way (data → never → dashboards).
-2. **Dashboards are user-owned instances** — a dashboard is a free-form 2D grid
-   of placed widget instances, persisted as a JSONB `layout` list (the
-   `phoenix_kit_crm` `view_config` precedent), scoped personal / system / role.
+## What this module does NOT do
 
-## What this module does NOT have (by design)
-
-Its job is the widget-dashboard builder — placing widget *instances* on a
-per-user canvas. It deliberately stays thin so the surface is small and widget
-providers stay decoupled:
-
-- **No database tables or migrations of its own** — the
-  `phoenix_kit_dashboards` table and its `config` column ship as **core**
-  migrations (`V133` / `V139`), and DB access goes through
-  `PhoenixKit.RepoHelper.repo/0`. This module owns no Ecto repo and no DDL.
-- **No `route_module/0`** — the list page and the per-dashboard builder are
-  both `admin_tabs/0` entries with `live_view:` set (single-page pattern); no
-  locale-prefixed route variants.
-- **No dependency on widget providers** — the arrow points one way: a provider
-  exposes `phoenix_kit_widgets/0` and the Registry discovers it at runtime;
-  this module never depends on a provider package.
-- **No one-click presets (yet)** — a new dashboard starts empty; the ready-made
-  "Overview" / "personal" preset sets are a TODO (see below), not shipped.
-
-## Key Modules
-
-- `PhoenixKitDashboards` — `PhoenixKit.Module` callbacks (tab, permission,
-  enable/disable, `version`, `css_sources`, `get_config`).
-- `PhoenixKitDashboards.Widget` — the widget **type** struct + `from_map/2`
-  normalization of the plain-map provider contract. Views may declare a per-view
-  `min_size` (`min_size_for/2`); resize limits, the settings modal, and view
-  switching (which auto-grows the placement where the grid has room) all honour
-  the selected view's floor. `Widgets.ClockWidget` is the worked example:
-  normal/digital/analog views (analog floors at 8×8), per-instance timezone
-  (fixed UTC offsets always; IANA city zones only when the host configures a tz
-  database) and a show/hide-timezone toggle.
-- `PhoenixKitDashboards.Registry` — convention-based discovery (queries
-  `PhoenixKit.ModuleRegistry`, calls `phoenix_kit_widgets/0` on exporters),
-  cached in `:persistent_term`, filtered by module enablement + permissions.
-- `PhoenixKitDashboards.Widgets` + `Widgets.*` — built-in widgets (Note, Clock,
-  Module stats). Each is a `Phoenix.LiveComponent`.
-- `PhoenixKitDashboards.Schemas.Dashboard` + `PhoenixKitDashboards.Dashboards` —
-  schema (JSONB `layout`) + context. The `phoenix_kit_dashboards` table is created
-  by **core** migration `V133` (see below), not by this module. The context logs
-  a business activity on every user-meaningful mutation (create/update/delete +
-  widget add/remove/configure); `save_layout/2` is the drag/resize hot path and is
-  deliberately **not** logged.
-- `PhoenixKitDashboards.Web.{DashboardsLive, BuilderLive}` — manage page + grid
-  builder. `PhoenixKitDashboards.Web.Helpers` provides `actor_opts/1` for
-  threading the acting user into context calls.
-
-## Critical Conventions
-
-- **Module key** `"dashboards"`, consistent across all callbacks.
-- **Tab IDs** prefixed `:admin_` (`:admin_dashboards`).
-- **URL paths** use hyphens; navigation always via `PhoenixKitDashboards.Paths`
-  → `PhoenixKit.Utils.Routes.path/1`, never hardcoded.
-- **UUIDv7 primary keys**: `@primary_key {:uuid, UUIDv7, autogenerate: true}`.
-- **No own repo** — DB access through `PhoenixKit.RepoHelper.repo/0`.
-- **No DB work in modules** — modules never define migrations or DDL. New tables
-  go into **core `phoenix_kit`** as a new versioned migration. The
-  `phoenix_kit_dashboards` table is core `V133`
-  (`phoenix_kit/lib/phoenix_kit/migrations/postgres/v133.ex`).
-- **`enabled?/0`** rescues + catches `:exit`, returns `false` on any failure.
-- **Activity logging** — every mutating context function accepts `opts \\ []` and
-  logs via `PhoenixKit.Activity.log/1`, guarded with `Code.ensure_loaded?/1` +
-  rescued so a logging failure never crashes the mutation. LiveViews pass
-  `Web.Helpers.actor_opts/1`.
-- **Gettext** — this module ships its **own** backend (`PhoenixKitDashboards.Gettext`,
-  `priv/gettext/{en,et,ru}`), like `phoenix_kit_crm`/`_warehouse`/`_manufacturing`.
-  Every LiveView/component `use Gettext, backend: PhoenixKitDashboards.Gettext`
-  (added explicitly even where `use PhoenixKitWeb, :live_view`/`:html` would
-  otherwise pull in core's backend — the later `use Gettext` shadows it).
-  `Web.Helpers.translate_catalog/1` is the runtime path for catalog DATA
-  (widget names/descriptions/view names/settings labels — plain strings from
-  the provider contract, `Gettext.gettext(PhoenixKitDashboards.Gettext, string)`);
-  since `mix gettext.extract` can't see a literal behind a variable, the
-  built-ins' own catalog strings are pinned via `Widgets.__catalog_strings__/0`
-  (`gettext_noop/1` calls). `admin_tabs/0` and `permission_metadata/0` labels
-  hit the same trap for the same reason (`Tab.localized_label/1` /
-  `Permissions.localized_module_label/1` call `dgettext/3` at render time with
-  a variable) — `translatable_labels/0` pins those via `dgettext_noop/2`.
-- **Form components** — use core `PhoenixKitWeb.Components.Core.{Input, Select,
-  Textarea, Checkbox}` (`<.input>` / `<.select>` / `<.textarea>` / `<.checkbox>`),
-  which render the daisyUI 5 `<label class="select">` wrapper. Never put the
-  `select` class directly on `<select>`.
-
-## The grid (Phoenix-first, no module JS)
-
-The builder grid is **server-rendered HEEx + a CSS grid** — each widget is anchored
-at its placement's explicit cells (`grid-column/-row: <x+1> / span <w>`) on the
-active layout's lattice. It renders and is readable **without any
-JavaScript**, and every mutation (add / remove / move / resize) re-renders
-normally — there is **no** `phx-update="ignore"` and no client-owned DOM.
-
-**Drag-to-place** is progressive enhancement via the module's own
-**`DashboardGridDrag`** hook (core's SortableJS-based `SortableGrid` is 1D reorder —
-it can't do 2D cell placement): the grid container sets
-`phx-hook="DashboardGridDrag"` + `data-cols`, each card is a
-`.sortable-item[data-id]` carrying `data-x/-y/-w/-h`, dragged by its
-`.pk-drag-handle` — the widget's WHOLE top bar (buttons inside it are excluded
-by the hook, so settings/remove still click; the grip icon is just the
-affordance). A floating clone follows the cursor while the widget itself
-jumps cell-to-cell under it as the live preview — the target cell comes from the
-clone's top-left against the grid metrics (data-cols + computed gaps/auto-rows +
-the fit scale), and the preview only ever moves through FREE cells (occupancy from
-the other cards' data attrs), so the shown spot is always legal and **the drop
-always matches the preview**. On drop it pushes `move_widget_grid %{id, x, y}`
-(0-based cells; `Dashboards.place_widget_grid/5` clamps + collision-rejects
-server-side). There is **no viewport/tier detection** — a dashboard opens
-instantly on its first layout (no loading state; no-JS reveals via
-`<noscript>`). **Catalog drag-out** (`DashboardCatalogDrag` on `#dashboard-catalog`,
-entries carry `data-widget-key/-w/-h`): drag an entry past a ~6px threshold and a
-ghost + a free-cells-only dashed footprint follow the pointer; dropping pushes
-`add_widget_at %{key, x, y}` (grid) or `add_widget_px %{key, fx, fy}` (pixel
-canvas) — a plain click still adds at the first free spot, and a completed drag
-swallows its trailing click. **Resize** is a bottom-right corner grip (`.pk-resize-handle`) driven
-by the per-card `DashboardResize` hook — pixel-smooth while dragging, and on
-release it **branches on the card's `data-free` flag**: grid mode snaps to the
-nearest whole cell that FITS (grid edge + neighbours, mirroring `Grid.fit_size/8`)
-keeping the x/y anchor → `resize_widget_to %{id, w, h}`; free mode keeps the exact
-px → `resize_widget_to %{id, fw, fh}` (clamped to `[60, 4000]`). No-JS fallbacks:
-the Settings modal's Width/Height + Column/Row inputs (grid) and Width/Height +
-X/Y px inputs (pixel). All placement drags **edge auto-scroll** the pane (a shared
-rAF scroller; FreeDrag folds the pane-scroll delta into its drag deltas).
-
-The module hooks ship via `js_sources/0` (`priv/static/assets/phoenix_kit_dashboards.js`):
-`DashboardGridDrag` (above), `DashboardFreeDrag` (free canvas — drag a
-`.pk-free-handle` grip, moves the card via `left/top` and pushes
-`move_widget_to %{id, fx, fy}` in exact px), `DashboardResize` (corner resize, both
-modes; see above), plus the fit/fullscreen helpers (`DashboardGridFit`,
-`DashboardFreeFit`, `DashboardFullscreen`, `DashboardFitScreen` — the Layout
-bar's "Fit screen" button, reporting the real `window.screen` px). All are
-enhancement only — the non-hook fallbacks are the server-driven modal inputs.
-The drag/resize hooks leave the card exactly where dropped and update the
-style in the server's format, so the re-render confirms identically with **no
-rubber-band / no snap**; they guard concurrent pointers + handle `pointercancel`,
-and only the primary button starts a gesture. An earlier scaffold loaded gridstack
-from a CDN via an inline `<script>`; that was removed (it broke on LiveView
-navigation). Do not reintroduce inline-`<script>` hooks — ship any hook via
-`js_sources/0`.
-
-## Dashboard type (fixed at creation) & the layout model
-
-A dashboard's **type is chosen at creation** (`config["type"]` = `"grid"` | `"pixel"`)
-and is fixed — there is no runtime toggle (`Dashboard.type/1`; legacy `config["mode"]`
-`"free"`→`"pixel"` still maps; `Dashboard.layout_mode/1` derives `"free"`/`"grid"` from
-type for the builder's internal render switch).
-
-**Geometry is embedded per widget** (`PhoenixKitDashboards.Layout`) so add/remove is
-atomic — a widget item is `%{id, widget_key, settings, view, "pixel" => %{fx,fy,fw,fh},
-"bp" => %{<layout_id> => %{x,y,w,h,hidden,pos}}}`. The grid-placement JSONB key stays
-`"bp"` for back-compat, but it is keyed by **layout id** (`"l1"`, …), not a device
-breakpoint — the code accordingly names the argument `layout_id` (the pre-lattice
-`bp`/"tier" vocabulary was renamed 2026-07-18; only the storage key is unchanged).
-`Layout.pixel/1` + `placement/2` default and fall back to the legacy flat shape
-(`pos` is the legacy-order tiebreaker; items without stored `x`/`y` are packed at
-render and pinned on their first edit).
-
-- **`"grid"` — the SCREENFUL LATTICE.** A grid dashboard is an ordered list
-  of named layouts in `config["layouts"]`
-  (`[%{"id","name","cols","rows"}]`, `Dashboards.layouts/1`; default
-  `Layout 1` at 64×36 = 16:9); the builder shows them as a tab strip
-  (`[Layout 1] [Wall TV] [+]` + an actions dropdown with Rename/Delete on
-  the active tab). "+" instant-creates "Layout N" copying the active
-  layout's dims + placements (doubles as duplicate) and drops into inline
-  rename. The last layout can't be deleted; deleting one strips its
-  per-widget placements (widgets are dashboard-level and live on elsewhere).
-  Each layout is `cols × rows` on a **gapless 25px nominal SQUARE cell
-  lattice** (`PhoenixKitDashboards.Lattice`: cell 25, dims 4..160, stretch
-  tolerance 1.04) representing **exactly ONE SCREENFUL — nothing scrolls,
-  ever**. `DashboardGridFit` sizes the canvas
-  NATIVELY (no transform — text/SVG render crisp and undistorted): per-axis
-  fill when both scales stay within ~4% of 1 and of each other (a fitted
-  screen fills exactly; only the cell rectangles go non-square), else the
-  intact **artboard** (`bg-base-100 shadow-xl ring-1`, mono caption
-  `Layout 1 · 64×36` hidden when no room below) shrinks into a smaller
-  pane or floats centered at NATURAL size in a bigger one — standard
-  cells, never blown up. The
-  Layout bar has numeric Grid `cols × rows` inputs (`set_dims`) and a
-  **Fit screen** button (`DashboardFitScreen` pushes real screen px;
-  server rounds px/25). `set_grid_dims/4` NEVER refuses: it clamps to
-  Lattice bounds and raises to the occupied extent (shrinking can't crop
-  widgets). Widget spans are lattice units (note 16×8 default, min 8×4;
-  visual gap = the card's own `m-[2px]`, folded into the resize hook's gap
-  term; drag/resize hooks are per-axis-zoom aware). **Widget content
-  self-fits** via container queries (`[container-type:size]` +
-  `cqmin`/`cqh` type) — the view (detailed/dense/…) is user-chosen (hover
-  toolbar cycle button, `cycle_view`) and honored verbatim at ANY size —
-  never silently switched. On the grid the view is PER LAYOUT (stored on
-  that layout's placement as `"view"`, `Layout.view/2` resolves override →
-  instance default; `set_layout_view/4` writes it) — designing the phone
-  layout means choosing how widgets look ON the phone. The pixel canvas
-  has no layouts, so there the view stays instance-level; list widgets take an "items: N" slot budget
-  (body divides into N fixed slots + a "+N more" line; see
-  `ModuleStatsWidget` for the worked pattern). Widgets never overlap; a
-  widget without a stored placement in a layout packs first-fit at render
-  (its TYPE default span) and pins on first edit. NO legacy/tier
-  compatibility — pre-lattice configs just get the fresh default layout. A
-  session-local **Show-grid toggle** paints a dot lattice as a CSS
-  background (`radial-gradient` at 25px pitch — zero extra DOM; per-cell
-  divs would be thousands of nodes) even on an EMPTY board (hint floats
-  over it).
-- **`"pixel"` — an absolute pixel canvas**: drag/resize anywhere, exact px in
-  `pixel.fx/fy/fw/fh`, no snapping. Widgets may **overlap deliberately** — each
-  widget bar has bring-to-front / send-to-back (`restack_widget_px/3`, a `"z"`
-  key in the pixel map that survives moves since `put_pixel` merges). No Layout
-  bar and no zoom control (pixel has no tiers; fit-to-width handles scale). The
-  **`DashboardFreeFit`** hook scales the canvas via `transform: scale` to **fill
-  the container width** AND grows its height to at least the pane's (edge-to-edge,
-  no gap around the canvas; a loading spinner covers the pane until the fit
-  reveals it) — re-fit by a `ResizeObserver` (`scrollbar-gutter: stable` prevents
-  a feedback loop); a `.pk-free-spacer` gives the scroll extent. `transform:
-  scale` (not CSS `zoom`) so the drag/resize hooks' `rect.width/offsetWidth`
-  reads the exact scale. Move = `DashboardFreeDrag` (`left/top`, pane-scroll
-  compensated); resize = the corner grip in px.
-
-Both types render + are operable without JS (grid: Settings modal size +
-Column/Row inputs; pixel: modal size + X/Y px inputs).
-- **Widget views + size**: a widget type may declare `views: [%{key:, name:}]`
-  render variants (detailed / compact / color grid…); the instance stores the
-  selected `"view"`, and the host passes both `view` and `size` (`%{w:, h:}`) to
-  the widget `LiveComponent` so one widget renders several densities and
-  auto-degrades when small. Reference: `Widgets.ModuleStatsWidget`; the real
-  consumer is `phoenix_kit_projects`' five widgets.
-- **Live refresh**: a widget type may declare `refresh_interval` (ms); the host
-  (`BuilderLive`) runs a single `:refresh_tick` loop and `send_update/2`s each due
-  widget so it re-queries. `Widgets.ClockWidget` (1 s) and the projects widgets
-  (15–30 s) use it. Widgets never subscribe themselves (LiveComponents have no
-  process); the host drives refresh.
-- **Scopes + sharing**: dashboards are `personal` / `system` (shared) / `role`.
-  **Role-scope creation is HIDDEN in the UI for now** (boss call 2026-07-14 —
-  it was briefly offered in the old create modal): the form page authors
-  personal/system only; the backend keeps full role support (`list_for_user/2`
-  role visibility, handler path), and an already-role-scoped dashboard is
-  grandfathered on its edit page (role picker from core `Roles.list_roles/0`)
-  so a save can't silently convert it. The manage page **clones** any visible
-  dashboard into a private copy, and
-  gates delete/visibility via `can_view?`/`can_delete?`; `list_for_user/2` takes
-  the user's role uuids so role dashboards surface for their members.
-
-## Tailwind CSS
-
-UI templates are scanned via `css_sources/0` (`[:phoenix_kit_dashboards]`). Core's
-`:phoenix_kit_css_sources` compiler wires the host's Tailwind `@source` at compile
-time — zero-config after `mix phoenix_kit.install`.
-
-## Routing
-
-Single-page pattern: the list page and the hidden per-dashboard builder are both
-declared as `admin_tabs/0` entries with `live_view:` set (the builder is
-`visible: false` with a `:uuid` dynamic segment spliced into the generated route).
-This matches `phoenix_kit_locations` / `phoenix_kit_catalogue`. Do **not** add a
-`route_module/0` — that's only needed for locale-prefixed route variants.
-
-## Database & Migrations
-
-This module owns no DDL. The backing `phoenix_kit_dashboards` table (personal /
-system / role scopes, JSONB `layout`, `owner_user_uuid` FK → `phoenix_kit_users`
-`ON DELETE CASCADE`) ships as core migration **V133** (first released in core
-`1.7.145`).
-
-The per-dashboard JSONB **`config`** column (type + named layouts) ships as core
-migration **V139**, released in core **`1.7.179`**. The config-dependent features
-(type, named layouts) need that column. The `mix.exs` core pin
-floor is `~> 1.7.189` (the release shipping `PhoenixKit.SchemaPrefix`, applied to
-every table-backed schema here) — and it can't go below `1.7.179` regardless:
-a core older than that would resolve an older pin yet lack
-the column the layout engine reads. Cross-repo work can still run against
-**local core** (`PHOENIX_KIT_PATH=../phoenix_kit`), where `ensure_current` builds
-the migration; standalone `mix test` needs a core `>= 1.7.179` for the
-config-dependent integration tests (no GitHub Actions CI here).
-
-## Testing
-
-Two levels: **unit** (no DB — `test/phoenix_kit_dashboards_test.exs`) and
-**integration** (`:integration` tag via `DataCase` / `LiveCase`, real PostgreSQL).
-
-```bash
-createdb phoenix_kit_dashboards_test          # first time (or: mix test.setup)
-PHOENIX_KIT_PATH=../phoenix_kit mix test      # vs local core (see below)
-```
-
-`database:` / `pool_size:` in `config/test.exs` read `PGDATABASE` /
-`PGPOOL` instead, falling back to the hardcoded name above and
-`System.schedulers_online() * 2` when unset — same mechanism core
-`phoenix_kit`'s `config/test.exs` uses. Set both to point this suite
-at a database it doesn't own and can't `CREATEDB` for itself, e.g. a
-shared instance also used by sibling `phoenix_kit_*` modules:
-
-```bash
-PGDATABASE=migration_test_db PGPOOL=6 mix test
-```
-
-**Caution:** this composes dangerously with the `PHOENIX_KIT_PATH` line
-above. If `PGDATABASE` points at a database other modules also use,
-don't combine it with a local core checkout — the `ensure_current/2`
-call below would then run *that* core's migration chain against the
-shared database, moving its schema for every other module pointed at
-the same `PGDATABASE`, not just this suite.
-
-Without PostgreSQL, integration tests auto-exclude and unit tests still run.
-`test/test_helper.exs` builds the schema via
-`PhoenixKit.Migration.ensure_current/2` (no module-owned DDL) and starts the test
-Endpoint. Support harness in `test/support/`: `Test.Repo`, `Test.Endpoint`,
-`Test.Router` (scoped `/en/admin/dashboards`), `Test.Layouts`, `Test.Hooks`
-(`:assign_scope` on_mount — its `nil` branch still assigns `phoenix_kit_current_scope`
-because `BuilderLive` reads it strictly), `DataCase`, `LiveCase` (`fake_scope/1` +
-`put_test_scope/2` + `fixture_dashboard/2`), `Fixtures` (`user_fixture/1` — a real
-`phoenix_kit_users` row is required for the owner FK), `ActivityLogAssertions`.
-
-`test/i18n_test.exs` is a smoke test for the per-module i18n wiring (see
-"Gettext" above and `/www/phoenix_kit/guides/per-module-i18n.md`) — tagged
-`:requires_phoenix_kit_i18n_api`, excluded by `test/test_helper.exs` only if
-`phoenix_kit` ever resolves below the release that shipped `gettext_backend:`
-(this module's floor already postdates it).
-
-## Local cross-repo development
-
-The core pin resolves from Hex by default. Export `PHOENIX_KIT_PATH=../phoenix_kit`
-(the `pk_dep/3` helper in `mix.exs`) to build against a local core checkout — unset
-= the published pin, so `mix hex.publish` is unaffected. Never commit a hand-edited
-`path:` tuple.
+- **No migrations or DDL of its own** — see "Database & migrations".
+- **No Ecto repo** — DB access goes through `PhoenixKit.RepoHelper.repo/0`.
+- **No `route_module/0`** — every page is an `admin_tabs/0` entry with
+  `live_view:` set (single-page pattern, like `phoenix_kit_locations` /
+  `phoenix_kit_catalogue`). `route_module/0` is only for locale-prefixed route
+  variants; adding one here would register the same paths twice.
+- **No dependency on widget providers** — a provider must stay usable without
+  this package installed.
+- **No one-click presets** — a new dashboard starts empty (see TODOs).
+- **No viewport/tier detection** — a grid dashboard opens on its first named
+  layout, not on a layout picked from the device width.
 
 ## Commands
 
 ```bash
 mix deps.get
-mix test                 # unit tests; :integration excluded without a DB
-mix format
-mix credo --strict
-mix precommit            # compile (warnings-as-errors) + checks
+createdb phoenix_kit_dashboards_test          # once; DB-backed tests are tagged :integration and auto-skip without it
+mix test
+mix precommit                # compile --warnings-as-errors + format + credo --strict + dialyzer; run before every commit
 ```
 
-## Versioning & Releases
-
-This project follows [Semantic Versioning](https://semver.org/). The version
-lives in **`mix.exs`** (`@version`); `lib/phoenix_kit_dashboards.ex`'s `version/0`
-derives it at compile time (`Mix.Project.config()[:version]`) and
-`test/phoenix_kit_dashboards_test.exs` asserts the two stay in sync — so a
-release bumps `@version` in `mix.exs` only.
-
-Tags use **bare version numbers** (no `v` prefix):
+`phoenix_kit*` deps resolve from Hex. To run against a local checkout, export
+`<APP>_PATH` (the dep's app name upper-cased plus `_PATH`); `pk_dep/3` in
+`mix.exs` swaps the Hex pin for a `path:` dep at resolve time. Unset means the
+Hex pin, so `mix hex.publish` is unaffected. Run `mix deps.get` with the var
+exported before the first `mix test` (a stale lock aborts on the optional
+`igniter` dep), and never commit a hand-edited `path:` tuple.
 
 ```bash
-git tag 0.1.0
-git push origin 0.1.0
-gh release create 0.1.0 --title "0.1.0 - YYYY-MM-DD" --notes "..."
+PHOENIX_KIT_PATH=../phoenix_kit mix deps.get && PHOENIX_KIT_PATH=../phoenix_kit mix test
 ```
 
-### Full release checklist
+`MIX_ENV=test mix test.setup` creates the test database and `MIX_ENV=test mix
+test.reset` drops and recreates it. Both need `MIX_ENV=test`: `Test.Repo` is
+compiled only in that environment, so the alias fails with `:nofile` in `dev`.
 
-1. Bump `@version` in `mix.exs`.
-2. Add a `CHANGELOG.md` entry.
-3. Run `mix precommit` — ensure zero warnings/errors.
-4. Commit: `"Bump version to x.y.z"`.
-5. Push to `main` and **verify the push succeeded** before tagging.
-6. `git tag x.y.z && git push origin x.y.z`.
-7. `gh release create x.y.z --title "x.y.z - YYYY-MM-DD" --notes "..."`.
+## Conventions
 
-**Never tag before all changes are committed and pushed.** Tags are immutable pointers.
+- **Module key** `"dashboards"`, used identically in every callback, the
+  permission key and `update_boolean_setting_with_module/3`.
+- **Tab ids** are prefixed `:admin_` (`:admin_dashboards`, …); **URL segments use
+  hyphens**.
+- **Paths** always come from `PhoenixKitDashboards.Paths`
+  (`index/0`, `new/0`, `edit/1`, `builder/1`), which routes through
+  `PhoenixKit.Utils.Routes.path/1` so the host's PhoenixKit URL prefix and
+  locale are honoured. Never hardcode `/admin/dashboards`.
+- **Routing** is the single-page pattern: pages are `admin_tabs/0` entries with
+  `live_view:` set; hidden ones carry `visible: false` and a `parent:`, and the
+  `:uuid` dynamic segment is spliced verbatim into the generated route. Never
+  hand-register these routes in a host router, and do not add `route_module/0`.
+- **LiveView macro:** admin LiveViews (`DashboardsLive`, `BuilderLive`,
+  `DashboardFormLive`) use `use PhoenixKitWeb, :live_view`;
+  `BuilderComponents` uses `use PhoenixKitWeb, :html`. `ProjectDashboardLive`
+  is plain `use Phoenix.LiveView` because it is embedded as a tab inside the
+  projects hub rather than mounted as an admin page. Widgets are
+  `Phoenix.LiveComponent`s. No template wraps in `LayoutWrapper` — core's admin
+  layout already surrounds them.
+- **Gettext:** this module ships its **own** backend
+  (`PhoenixKitDashboards.Gettext`, `priv/gettext/{en,et,ru}`). Every
+  LiveView/component adds `use Gettext, backend: PhoenixKitDashboards.Gettext`
+  explicitly, **after** `use PhoenixKitWeb, :live_view`/`:html` — the later
+  `use Gettext` shadows core's backend, so the ordering is load-bearing.
+  Extract/merge with `mix gettext.extract --merge`.
+  - `Web.Helpers.translate_catalog/1` is the runtime path for catalog **data**
+    (widget names/descriptions/view names/settings labels — plain strings that
+    arrive from the provider contract) via
+    `Gettext.gettext(PhoenixKitDashboards.Gettext, string)`.
+  - Because `mix gettext.extract` cannot see a literal behind a variable, every
+    such msgid needs a **noop anchor**: `Widgets.__catalog_strings__/0`
+    (`gettext_noop/1`) pins the built-in widgets' catalog strings, and
+    `translatable_labels/0` (`dgettext_noop/2`) pins the four tab labels (one of
+    which doubles as the permission label) that `Tab.localized_label/1` and
+    `Permissions.localized_module_label/1` translate at render time through each
+    declaration's `gettext_backend`/`gettext_domain`.
+- **JS hooks** ship as a prebuilt bundle declared by `js_sources/0`
+  (`priv/static/assets/phoenix_kit_dashboards.js`, global
+  `PhoenixKitDashboardsHooks`): `DashboardGridDrag`, `DashboardCatalogDrag`,
+  `DashboardFreeDrag`, `DashboardResize`, `DashboardGridFit`,
+  `DashboardFreeFit`, `DashboardFitScreen`, `DashboardFullscreen`,
+  `DashboardVisibility`. They are **enhancement only** — both dashboard types
+  render and stay fully operable without JavaScript through the Settings
+  modal's size / Column-Row / X-Y inputs, and nothing uses
+  `phx-update="ignore"`. Never register a hook from an inline `<script>`:
+  morphdom does not execute inserted script tags, so the hook vanishes on
+  LiveView navigation. `js_sources/0` carries no `@impl` — older core releases
+  do not declare the callback.
+- **Tailwind:** `css_sources/0` returns `[:phoenix_kit_dashboards]`; core's
+  `:phoenix_kit_css_sources` compiler wires the host's `@source` at compile
+  time, so templates are scanned with no host configuration.
+- **Form components** come from core:
+  `PhoenixKitWeb.Components.Core.{Input, Select, Textarea, Checkbox}`
+  (`<.input>` / `<.select>` / `<.textarea>` / `<.checkbox>`), which render the
+  daisyUI 5 `<label class="select">` wrapper. Never put the `select` class
+  directly on a `<select>`.
+- **`enabled?/0`** reads `dashboards_enabled`, rescues and catches `:exit`, and
+  returns `false` on any failure. `enable_system/0` also calls
+  `Registry.refresh/0` so a provider enabled alongside this module is picked up
+  without a BEAM restart.
+- **Activity logging:** every mutating context function takes `opts \\ []` and
+  logs through `PhoenixKit.Activity.log/1`, guarded with `Code.ensure_loaded?/1`
+  and rescued so a logging failure never crashes the mutation. LiveViews thread
+  the actor with `Web.Helpers.actor_opts/1`. `save_layout/2` is the drag/resize
+  hot path and is deliberately **not** logged.
+- **Dashboard type is fixed at creation** — `config["type"]` is `"grid"` or
+  `"pixel"` and there is no runtime toggle (legacy `config["mode"]` `"free"`
+  still maps to `"pixel"`). A type change means creating a new dashboard.
+- **Scopes and sharing:** `personal` (owner-private) / `system` (shared with
+  everyone) / `role` (visible to a role's members).
+  - **Role-scope creation is hidden in the UI**: the form page authors
+    personal/system only. The backend keeps full role support
+    (`list_for_user/2` role visibility, the handler path), and an
+    already-role-scoped dashboard is grandfathered on its edit page (role picker
+    from core `Roles.list_roles/0`) so a save cannot silently convert it.
+  - The manage page **clones** any visible dashboard into a private copy and
+    gates visibility/delete via `Web.Helpers.viewable_by?/2` and
+    `manageable_by?/2` (context-side: `Dashboards.visible_to?/3`).
+    `list_for_user/2` takes the user's role uuids so role dashboards surface for
+    their members.
+  - Only `system` dashboards may back a project-extension tab
+    (`project_dashboard_options/0` lists exactly those) — personal and role
+    dashboards carry per-user visibility a project-wide tab cannot honour.
+- **One write choke point:** every mutation reaches the database through the
+  context's private `persist/1`, which owns both live sync (broadcast) and the
+  optimistic lock. Do not add a second write path.
+- **UUIDv7 primary keys** (`@primary_key {:uuid, UUIDv7, autogenerate: true}`)
+  and `use PhoenixKit.SchemaPrefix` on every table-backed schema.
 
-## Pull Requests
+### Landmines
 
-Branch `main`; PR `main → main`. Commit messages start with `Add`, `Update`,
-`Fix`, `Remove`, `Merge` — **no AI attribution footers**. There is no GitHub
-Actions CI on this repo: test state is whatever local `mix test` reports (run
-against local core via `PHOENIX_KIT_PATH`).
+- Tabs generate routes in declaration order: the static `dashboards/new` MUST be
+  declared before the dynamic `dashboards/:uuid`, or the builder route swallows
+  the create page.
+- A catalog string that reaches gettext through a variable (widget names, view
+  names, settings labels, tab/permission labels) is invisible to
+  `mix gettext.extract` — if the msgid is not pinned by
+  `Widgets.__catalog_strings__/0` or `translatable_labels/0`, it silently never
+  enters `default.pot` and renders untranslated.
+- The Registry catalog's **structure** is memoized in `:persistent_term`: a
+  newly installed provider, a changed widget definition (`views`,
+  `settings_schema`, `refresh_interval`) or a computed option list (e.g. the
+  module-stats picker) does not appear until `Registry.refresh/0` runs.
+  Enablement and permissions are re-checked live and need no refresh.
+- `BuilderLive.render/1` reads `@phoenix_kit_current_scope` strictly, so
+  `Test.Hooks`'s `nil` branch must still assign it (as `nil`); dropping that
+  branch raises `KeyError` in every builder test that sets no scope.
+- Placement edits persist via `Ecto.Changeset.force_change/3`: `materialize_grid`
+  pre-mutates the struct in memory, so a plain `change/2` diffs against the
+  materialized copy and silently skips the write when the edit equals the packed
+  values.
 
-PR review files go in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/` — a
-`README.md` (PR summary) plus a per-reviewer `{AGENT}_REVIEW.md` (e.g.
-`CLAUDE_REVIEW.md`; never append to another agent's file). See
-`dev_docs/pull_requests/README.md` + `TEMPLATE.md`. Severity taxonomy:
-`BUG - CRITICAL/HIGH/MEDIUM`, `IMPROVEMENT - HIGH/MEDIUM`, `NITPICK`.
+## Architecture
+
+```
+lib/phoenix_kit_dashboards.ex          # PhoenixKit.Module callbacks + both provider contracts
+lib/phoenix_kit_dashboards/
+  dashboards.ex                        # context: CRUD, placement, live sync, optimistic lock
+  schemas/dashboard.ex                 # the phoenix_kit_dashboards schema (JSONB layout + config)
+  widget.ex                            # widget TYPE struct + from_map/2 normalization
+  registry.ex                          # provider discovery + :persistent_term catalog
+  widgets.ex, widgets/*.ex             # built-in widgets (note, clock, module stats)
+  layout.ex, grid.ex, lattice.ex, sizing.ex, layouts.ex  # geometry + placement engine
+  paths.ex, gettext.ex
+  web/                                 # DashboardsLive, DashboardFormLive, BuilderLive,
+                                       # ProjectDashboardLive, BuilderComponents, Helpers
+priv/static/assets/phoenix_kit_dashboards.js   # the js_sources/0 hook bundle
+```
+
+Key modules:
+
+- `PhoenixKitDashboards` — `PhoenixKit.Module` callbacks (`module_key`,
+  `enabled?`, `enable_system`/`disable_system`, `version`, `admin_tabs`,
+  `permission_metadata`, `css_sources`, `js_sources`, `get_config`) plus
+  `phoenix_kit_widgets/0` and `phoenix_kit_project_extensions/0`.
+- `PhoenixKitDashboards.Registry` — convention-based discovery: queries
+  `PhoenixKit.ModuleRegistry` and calls `phoenix_kit_widgets/0` on any module
+  exporting it (always including this one), memoizes in `:persistent_term`, and
+  filters by module enablement + scope permission on every read
+  (`visible_for_scope?/2` is the render gate for already-placed widgets too).
+- `PhoenixKitDashboards.Widget` — the widget type struct and `from_map/2`, which
+  normalizes and sanitizes the plain-map contract; a malformed entry is dropped,
+  never allowed to abort catalog discovery.
+- `PhoenixKitDashboards.Lattice` / `Layout` / `Grid` / `Sizing` / `Layouts` —
+  the 25px square-cell design space and the placement/packing engine.
+- `PhoenixKitDashboards.Dashboards` — the context. `persist/1` is the single
+  write choke point.
+- `PhoenixKitDashboards.Web.Helpers` — `actor_opts/1`, `translate_catalog/1`,
+  `viewable_by?/2`, `manageable_by?/2`, `user_role_uuids/1`.
+
+### Widget provider contract
+
+Any module exposes widget types by defining a zero-arity `phoenix_kit_widgets/0`
+returning **plain maps** — no dependency on this package, no `@impl`, no new core
+callback. A host app that is not a PhoenixKit module declares providers in
+config instead: `config :phoenix_kit_dashboards, widget_providers: [MyApp.Widgets]`.
+
+| Key | Required | Meaning |
+|---|---|---|
+| `key` | yes | Globally unique catalog key (`"emails.deliverability"`). |
+| `name` | yes | Display name (translated through `translate_catalog/1`). |
+| `component` | yes | A `Phoenix.LiveComponent` module. |
+| `module_key` | no | Gates the widget on that module's enablement + permission. Absent = always offered. |
+| `default_size` / `min_size` | no | Lattice units. Defaults `%{w: 16, h: 8}` / `%{w: 8, h: 4}`. |
+| `max_size` | no | Accepted but **ignored** — every widget may span the full lattice (160). |
+| `settings_schema` | no | `[%{key, type, label, options, default}]`; types `:string`, `:text`, `:number`, `:boolean`, `:select`. Select `options` may be `{label, value}` tuples. |
+| `views` | no | `[%{key, name, min_size}]` named render variants; a view may raise the size floor (`min_size_for/2`). |
+| `refresh_interval` | no | Milliseconds, floored to 1000. The host runs one `:refresh_tick` loop and `send_update/2`s each due widget — widgets never subscribe or time themselves (a LiveComponent has no process). |
+| `description`, `icon`, `category` | no | Catalog presentation. |
+
+The host renders `<.live_component module={w.component} id={instance_id}
+settings={…} view={…} size={%{w:, h:}} scope={…} />`, so one widget can render
+several densities and degrade when small. Each widget owns its own data loading.
+
+`phoenix_kit_project_extensions/0` is the same style of duck-typed contract in
+the other direction: it offers `phoenix_kit_projects` a read-only **Dashboard**
+tab (`Web.ProjectDashboardLive`) rendering one linked shared dashboard, picked
+via `config_schema` from `project_dashboard_options/0`.
+
+### Data model
+
+One table, `phoenix_kit_dashboards`: `uuid` (UUIDv7 PK), `title`, `slug`,
+`owner_user_uuid` (FK → `phoenix_kit_users`, `ON DELETE CASCADE`), `role_uuid`,
+`scope`, `layout` (JSONB array), `config` (JSONB), `is_default`, `position`,
+timestamps. `[owner_user_uuid, slug]` is unique; `create/2` auto-uniquifies the
+title-derived slug with `-N` suffixes, retrying on a concurrent insert.
+
+- `layout` is read-whole / write-whole. One item is
+  `%{"id", "widget_key", "view", "settings", "pixel" => %{fx,fy,fw,fh}, "bp" => %{<layout_id> => %{x,y,w,h,hidden,pos}}}`
+  — geometry is embedded per widget so add/remove is atomic. The `"bp"` key name
+  is kept for back-compat but is keyed by **layout id**, not a breakpoint.
+- `config` holds dashboard-level state: `"type"` (`"grid"` | `"pixel"`, fixed at
+  creation), the ordered `"layouts"` list (`[%{"id","name","cols","rows"}]`), and
+  `"rev"`.
+- `config["rev"]` is a monotonic counter used as an **optimistic lock**: a write
+  lands only if `rev` is unchanged (compare-and-swap, so no migration). A losing
+  writer gets `{:error, :stale}` and re-syncs instead of clobbering the winner.
+
+### PubSub
+
+`Dashboards.topic(uuid)` = `"phoenix_kit_dashboards:<uuid>"`, subscribed via
+`Dashboards.subscribe/1` (which rescues to `{:error, :pubsub_unavailable}` so a
+missing PubSub server costs live sync, not the mount). Messages:
+`{:dashboard_updated, %Dashboard{}}` and `{:dashboard_deleted, uuid}`.
+`PubSubHelper` is used for both directions so cross-module broadcasts land on
+the host's PubSub; broadcast failures never crash a mutation.
+
+### Settings & permissions
+
+- Setting `dashboards_enabled` (boolean) — the module gate.
+- Permission key `"dashboards"`, declared by `permission_metadata/0` with
+  `gettext_backend:`/`gettext_domain:` so the admin matrix renders it
+  translated. All four tabs require it. The project extension declares
+  `permission_actions: [:view]`.
+- Host config `:phoenix_kit_dashboards, :widget_providers` — extra provider
+  modules (see the contract table above).
+
+## Database & migrations
+
+None. The `phoenix_kit_dashboards` table and its `config` column ship in
+**core's** versioned chain; `migration_module/0` is unset and this module writes
+no DDL. A schema change is a core migration first, then schema edits here.
+Table-backed schemas use UUIDv7 primary keys and `use PhoenixKit.SchemaPrefix`,
+and all DB access goes through `PhoenixKit.RepoHelper.repo/0`.
+
+## Testing
+
+Two levels: **unit** (no database — `test/phoenix_kit_dashboards_test.exs` and
+the geometry suites) and **integration** (`:integration`, applied automatically
+by `DataCase`/`LiveCase`, needs PostgreSQL). Without a database the integration
+tag is excluded and the unit tests still run.
+
+Test database `phoenix_kit_dashboards_test` (`mix test.setup` creates it).
+`test/test_helper.exs` requires the `test/support` files explicitly (Elixir 1.19
+no longer auto-loads them), probes for the database with `psql -lqt`, builds the
+schema with `PhoenixKit.Migration.ensure_current/2`, starts
+`PhoenixKit.PubSub.Manager` + `PhoenixKit.ModuleRegistry`, forces the URL-prefix
+cache to `"/"` so `Paths` matches the test router, and starts the test Endpoint
+only when the database is available.
+
+Support harness in `test/support/`: `Test.Repo`, `Test.Endpoint`, `Test.Router`
+(scoped `/en/admin/dashboards`), `Test.Layouts`, `Test.Hooks` (`:assign_scope`
+`on_mount`), `DataCase`, `LiveCase` (`fake_scope/1`, `put_test_scope/2`,
+`fixture_dashboard/2`), `Fixtures` (`user_fixture/1` — a real `phoenix_kit_users`
+row is required for the owner FK), `ActivityLogAssertions`.
+
+`config/test.exs` honours `PGUSER` / `PGPASSWORD` / `PGHOST` (defaults
+`postgres`), `PGDATABASE` and `PGPOOL`. A local Postgres without a `postgres`
+role needs `PGUSER=<your role>`, or the suite fails as pool timeouts that look
+like flakiness. `PGPOOL` bounds the pool (default
+`System.schedulers_online() * 2`, too many connections for a shared instance).
+
+> **Caution:** do not combine `PGDATABASE` (pointing at a shared database) with
+> `PHOENIX_KIT_PATH`. `ensure_current/2` would then run that local core's
+> migration chain against the shared database, moving the schema for every other
+> module pointed at it.
+
+`test/i18n_test.exs` smoke-tests the per-module i18n wiring. It is tagged
+`:requires_phoenix_kit_i18n_api` and excluded only if `phoenix_kit` ever resolves
+below the release that shipped the `gettext_backend:` API — a defensive guard
+against a stale lockfile, since the `mix.exs` floor already postdates it.
+
+## Feature notes
+
+| Feature | Invariant that must hold | Guide |
+|---|---|---|
+| Grid + pixel canvas, named layouts, drag/resize hooks | A grid layout is exactly one screenful (nothing scrolls); hooks are enhancement only and both types stay operable with JavaScript off. | [`dev_docs/guides/layout-model.md`](dev_docs/guides/layout-model.md) |
+
+## Versioning & releases
+
+SemVer. The version is single-sourced in `mix.exs` (`@version`); `version/0`
+reads it at compile time and the behaviour test asserts against
+`Mix.Project.config()[:version]`, so nothing else needs bumping.
+
+Release procedure (the steps the maintainer runs):
+
+1. Bump `@version` in `mix.exs`; add a `CHANGELOG.md` entry headed `## x.y.z - YYYY-MM-DD`.
+2. `mix precommit` clean.
+3. Commit (`"Bump version to x.y.z"`) and push; verify the push landed.
+4. `mix hex.publish`.
+5. Tag, matching the form of the newest existing tag (`git tag --sort=-creatordate | head -1` shows it), and push the tag.
+6. GitHub release via `gh release create` if the repo does those (`gh release list` shows whether it does).
+
+Tags are immutable pointers: never tag before the commit is pushed and the
+publish has succeeded.
+
+## Pull requests & commits
+
+- Commit messages start with an action verb (`Add`, `Update`, `Fix`, `Remove`, `Merge`). No AI attribution and no `Co-Authored-By` trailers.
+- Version bumps and CHANGELOG entries land with the release commit on upstream, not in feature PRs.
+- Review files live in `dev_docs/pull_requests/{year}/{pr_number}-{slug}/{AGENT}_REVIEW.md`, one file per reviewing agent, never edited by another agent; `FOLLOW_UP.md` records how each finding was resolved. Severities: `BUG - CRITICAL/HIGH/MEDIUM`, `IMPROVEMENT - HIGH/MEDIUM`, `NITPICK`.
 
 ## TODOs
 
-### Dashboard presets
-
-Offer one-click **presets** when creating (or on an empty) dashboard: the user
-picks e.g. "Overview" and gets a ready-made set of widgets already placed and
-configured (an overview preset ≈ projects board + workload + deadlines; a
-personal preset ≈ my-tasks + only-my-projects deadlines + a clock). Likely
-shape: a preset is data — a named list of `{widget_key, view, settings, size}`
-entries laid out by the same first-free packing as `add_widget/3` — and
-modules could contribute presets the same duck-typed way they contribute
-widgets. Idea noted 2026-07-08; not designed yet.
-
+- **Dashboard presets.** Offer one-click presets when creating (or on an empty)
+  dashboard: the user picks e.g. "Overview" and gets a ready-made set of widgets
+  already placed and configured (an overview preset ≈ projects board + workload
+  + deadlines; a personal preset ≈ my-tasks + only-my-projects deadlines + a
+  clock). Likely shape: a preset is data — a named list of
+  `{widget_key, view, settings, size}` entries laid out by the same first-free
+  packing as `add_widget/3` — and modules could contribute presets the same
+  duck-typed way they contribute widgets. Not designed yet; unblocked by a
+  product decision on which presets ship.
