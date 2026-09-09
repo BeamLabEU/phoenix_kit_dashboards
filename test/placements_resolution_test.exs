@@ -84,6 +84,68 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
     end
   end
 
+  describe "the leaks a review panel found" do
+    test "a ROLE-scoped dashboard cannot be published to everyone" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, restricted} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Finance only",
+          scope: "role",
+          role_uuid: Ecto.UUID.generate(),
+          owner_user_uuid: user.uuid
+        })
+
+      # Only rejecting `personal` let a Finance-only board be bound to
+      # "everyone" and rendered to the whole company.
+      assert {:error, :restricted_not_shareable} =
+               Placements.put("core.admin_home", %{
+                 "audience" => "everyone",
+                 "dashboard_uuid" => restricted.uuid
+               })
+    end
+
+    test "a structurally corrupt entry decodes to nothing, not to junk that raises" do
+      # `{"core.admin_home": "oops"}` used to survive as `["oops"]`, and the
+      # first `placement["position"]` raised on the binary.
+      PhoenixKit.Settings.update_setting_with_module(
+        "dashboards_placements",
+        ~s({"core.admin_home":"oops"}),
+        "dashboards"
+      )
+
+      assert Placements.all() == %{"core.admin_home" => []}
+      assert Placements.for_slot("core.admin_home") == []
+      assert {:none, []} = Placements.resolve("core.admin_home", nil)
+    end
+
+    test "a list with a junk entry keeps only the well-formed placements" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Good",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      PhoenixKit.Settings.update_setting_with_module(
+        "dashboards_placements",
+        Jason.encode!(%{
+          "core.admin_home" => [
+            "junk",
+            42,
+            %{"audience" => "everyone", "dashboard_uuid" => dashboard.uuid}
+          ]
+        }),
+        "dashboards"
+      )
+
+      assert {:everyone, [only]} = Placements.resolve("core.admin_home", nil)
+      assert only.uuid == dashboard.uuid
+    end
+  end
+
   describe "put/3 refusals" do
     test "an unknown dashboard is refused" do
       assert {:error, :unknown_dashboard} =

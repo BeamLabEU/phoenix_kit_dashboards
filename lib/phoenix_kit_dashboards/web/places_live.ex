@@ -143,6 +143,9 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   defp error_message(:personal_not_shareable),
     do: gettext("A personal dashboard can't be shown to other people. Pick a shared one.")
 
+  defp error_message(:restricted_not_shareable),
+    do: gettext("That dashboard is limited to one role. Only shared dashboards can go here.")
+
   defp error_message(:pixel_not_allowed_here),
     do: gettext("A wall-screen dashboard can't be used as an admin page.")
 

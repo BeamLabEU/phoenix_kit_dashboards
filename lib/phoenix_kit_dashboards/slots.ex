@@ -103,15 +103,31 @@ defmodule PhoenixKitDashboards.Slots do
       modules
       |> provider_slots()
       |> Enum.reduce(%{}, fn slot, acc ->
-        if Map.has_key?(acc, slot.key) do
-          Logger.warning(
-            "[Dashboards] Duplicate slot key #{inspect(slot.key)} from " <>
-              "#{inspect(slot.source)} — keeping the first registered one."
-          )
+        cond do
+          Map.has_key?(acc, slot.key) ->
+            Logger.warning(
+              "[Dashboards] Duplicate slot key #{inspect(slot.key)} from " <>
+                "#{inspect(slot.source)} — keeping the first registered one."
+            )
 
-          acc
-        else
-          Map.put(acc, slot.key, slot)
+            acc
+
+          # Distinct keys can still normalize to the same slug, and therefore
+          # to the same route and tab id ("sales.eu" and "sales-eu" both give
+          # "sales-eu"). One would shadow the other and open the wrong
+          # dashboard, so the collision is refused rather than resolved by
+          # whichever module happened to load first.
+          slug_taken?(acc, slot) ->
+            Logger.warning(
+              "[Dashboards] Slot #{inspect(slot.key)} from #{inspect(slot.source)} " <>
+                "collides on slug #{inspect(slot.slug)} with an already-registered " <>
+                "slot — dropping it."
+            )
+
+            acc
+
+          true ->
+            Map.put(acc, slot.key, slot)
         end
       end)
 
@@ -184,6 +200,10 @@ defmodule PhoenixKitDashboards.Slots do
   @doc "The generated route path for a `:module_tab` slot."
   @spec slot_path(Slot.t()) :: String.t()
   def slot_path(%Slot{slug: slug}), do: "dashboards/at/" <> slug
+
+  defp slug_taken?(acc, %Slot{} = slot) do
+    Enum.any?(acc, fn {_key, existing} -> existing.slug == slot.slug end)
+  end
 
   # ── Discovery ──────────────────────────────────────────────────────
 

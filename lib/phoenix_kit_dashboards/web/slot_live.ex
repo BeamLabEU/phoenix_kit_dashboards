@@ -97,8 +97,19 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
   end
 
   defp load_slot(%{assigns: %{slot_key: slot_key}} = socket) do
-    slot = Slots.get(slot_key)
     scope = socket.assigns[:phoenix_kit_current_scope]
+
+    # Re-check THIS slot's own permission. Every generated slot tab shares this
+    # LiveView, and core caches admin view permissions as a module -> key map,
+    # so the last slot registered decides the key enforced on every slot URL —
+    # a viewer holding one module's permission could otherwise open another
+    # module's slot by typing its address. The page cannot rely on the route
+    # gate alone.
+    slot =
+      case Slots.get(slot_key) do
+        nil -> nil
+        slot -> if Slots.visible_for_scope?(slot, scope), do: slot
+      end
 
     {tier, dashboards} =
       if slot, do: Placements.resolve(slot_key, scope), else: {:none, []}

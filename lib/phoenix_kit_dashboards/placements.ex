@@ -111,6 +111,11 @@ defmodule PhoenixKitDashboards.Placements do
 
     cond do
       is_nil(slot) -> {:none, []}
+      # The generated slot tabs all share one LiveView, and core caches admin
+      # view permissions as a module -> key map — so the last slot registered
+      # decides the key enforced for EVERY slot URL. Re-check the slot's own
+      # permission here, where it cannot be collapsed by a sibling.
+      not Slots.visible_for_scope?(slot, scope) -> {:none, []}
       match = personal_match(slot, user_uuid) -> tier(:personal, match, slot, opts)
       match = role_match(slot_key, scope) -> tier(:role, match, slot, opts)
       match = everyone_match(slot_key) -> tier(:everyone, match, slot, opts)
@@ -419,12 +424,15 @@ defmodule PhoenixKitDashboards.Placements do
 
   defp fetch_dashboard(_uuid), do: {:error, :unknown_dashboard}
 
-  # A personal dashboard carries per-user visibility that a shared surface
-  # cannot honour — binding one to a shared slot would show one person's
-  # private canvas to everybody. Same rule the project extension already
-  # enforces for its picker.
+  # Only a SYSTEM dashboard may fill a shared place. Personal and ROLE
+  # dashboards both carry visibility a shared surface cannot honour: a
+  # Finance-only board bound to "everyone" would publish restricted content to
+  # the whole company, and binding it to a DIFFERENT role is the same leak
+  # wearing a hat. Same rule the project extension already enforces for its
+  # picker, which offers `list_system/0` and nothing else.
+  defp validate_shareable(%Dashboard{scope: "system"}), do: :ok
   defp validate_shareable(%Dashboard{scope: "personal"}), do: {:error, :personal_not_shareable}
-  defp validate_shareable(%Dashboard{}), do: :ok
+  defp validate_shareable(%Dashboard{}), do: {:error, :restricted_not_shareable}
 
   defp validate_type(%Dashboard{} = dashboard, %Slot{surface: surface}) do
     if surface == :admin_home and Dashboard.type(dashboard) == "pixel" do
@@ -521,13 +529,24 @@ defmodule PhoenixKitDashboards.Placements do
 
   defp decode(json) when is_binary(json) do
     case Jason.decode(json) do
-      {:ok, %{} = blob} -> Map.new(blob, fn {k, v} -> {k, List.wrap(v)} end)
+      {:ok, %{} = blob} -> normalize_blob(blob)
       _ -> %{}
     end
   end
 
-  defp decode(%{} = blob), do: blob
+  defp decode(%{} = blob), do: normalize_blob(blob)
   defp decode(_other), do: %{}
+
+  # Every entry must be a LIST OF MAPS. Validating only the top level and
+  # `List.wrap/1`-ing the rest let `{"core.admin_home": "oops"}` through as
+  # `["oops"]`, and the first `placement["position"]` raised on the binary.
+  # A corrupt blob has to read as "no placements", which is what the docstring
+  # promises and what every caller is built to handle.
+  defp normalize_blob(blob) do
+    Map.new(blob, fn {key, value} ->
+      {to_string(key), value |> List.wrap() |> Enum.filter(&is_map/1)}
+    end)
+  end
 
   defp position(placement), do: int(placement["position"], 0)
   defp priority(placement), do: int(placement["priority"], 100)

@@ -73,6 +73,19 @@ defmodule PhoenixKitDashboards.Refresh do
   end
 
   defp do_tick(socket, dashboard, context) do
+    # A board with nothing live must let the loop DIE. `resume/1` arms a tick
+    # without checking (it cannot — the dashboard may have changed while the
+    # tab was hidden), so this is the only place that decides to stop; without
+    # it a static dashboard re-armed itself every second forever after the
+    # viewer came back to the tab.
+    if any_live?(dashboard) do
+      run_tick(socket, dashboard, context)
+    else
+      Process.put(:pk_refresh_scheduled, false)
+    end
+  end
+
+  defp run_tick(socket, dashboard, context) do
     now = System.monotonic_time(:millisecond)
     scope = socket.assigns[:phoenix_kit_current_scope]
     layout_id = socket.assigns[:active_layout]
