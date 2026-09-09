@@ -95,7 +95,10 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
      # while you design. Choosing a subject here stands in for the page it will
      # eventually sit on. Session-local and never persisted: it is a lens on
      # the canvas, not a property of it.
-     |> assign(:preview_context, %{})}
+     |> assign(:preview_context, %{})
+     # Live bind-source choices while the settings modal is open. Cleared with
+     # the modal, because they describe an unsaved form, not the dashboard.
+     |> assign(:bind_sources, %{})}
   end
 
   @impl true
@@ -491,14 +494,24 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     # Only for a widget that exists — a crafted/stale id must not park a
     # dangling id in the assign (the modal render would crash on nil).
     if settings_instance_data(socket.assigns.dashboard, instance_id) do
-      {:noreply, assign(socket, :settings_instance, instance_id)}
+      {:noreply, assign(socket, settings_instance: instance_id, bind_sources: %{})}
     else
       {:noreply, socket}
     end
   end
 
   defp do_handle_event("close_settings", _params, socket) do
-    {:noreply, assign(socket, :settings_instance, nil)}
+    {:noreply, assign(socket, settings_instance: nil, bind_sources: %{})}
+  end
+
+  defp do_handle_event("settings_changed", params, socket) do
+    sources =
+      case params["binds"] do
+        %{} = binds -> Map.filter(binds, fn {k, v} -> is_binary(k) and is_binary(v) end)
+        _ -> %{}
+      end
+
+    {:noreply, assign(socket, :bind_sources, sources)}
   end
 
   defp do_handle_event("preview_as", %{"kind" => kind, "value" => value}, socket)
@@ -595,7 +608,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         socket
       end
 
-    socket = assign(socket, :settings_instance, nil)
+    socket = assign(socket, settings_instance: nil, bind_sources: %{})
 
     case Dashboards.configure_widget(
            socket.assigns.dashboard,
@@ -1009,6 +1022,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         grid_placement={Dashboards.resolve_placement(@dashboard, @settings_instance, @active_layout)}
         cols={Dashboards.grid_cols(@dashboard, @active_layout)}
         max_rows={Dashboards.grid_rows(@dashboard, @active_layout)}
+        bind_sources={@bind_sources}
       />
     </div>
     """

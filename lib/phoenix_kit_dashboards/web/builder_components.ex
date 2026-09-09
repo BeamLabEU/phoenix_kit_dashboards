@@ -950,6 +950,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:grid_placement, :map, default: nil)
   attr(:cols, :integer, required: true)
   attr(:max_rows, :integer, required: true)
+  attr(:bind_sources, :map, default: %{})
 
   def settings_modal(assigns) do
     widget = Registry.get(assigns.instance["widget_key"])
@@ -986,7 +987,16 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         </span>
       </:title>
 
-      <form id="widget-settings-form" phx-submit="save_settings" class="flex flex-col gap-3">
+      <%!-- phx-change reports the bind-source picker: its "which one" field
+      and hint depend on the chosen source, and without a change event they
+      would only update after saving and reopening — which reads as a dead
+      dropdown. --%>
+      <form
+        id="widget-settings-form"
+        phx-submit="save_settings"
+        phx-change="settings_changed"
+        class="flex flex-col gap-3"
+      >
           <.select
             :if={@widget && @widget.views != []}
             name="view"
@@ -1096,6 +1106,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
             field={field}
             value={Map.get(@instance["settings"] || %{}, field.key)}
             bind={field[:context] && Binds.binds(@instance)[field[:context]]}
+            source={field[:context] && @bind_sources[field[:context]]}
           />
       </form>
 
@@ -1126,6 +1137,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:field, :map, required: true)
   attr(:value, :any, required: true)
   attr(:bind, :any, default: nil)
+  attr(:source, :any, default: nil)
 
   def settings_field(%{field: %{type: :text}} = assigns) do
     ~H"""
@@ -1150,7 +1162,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   # two. See `PhoenixKitDashboards.Binds` for why the choice is stored beside
   # `settings` rather than inside it.
   def settings_field(%{field: %{context: kind}} = assigns) when is_binary(kind) do
-    assigns = assign(assigns, :source, bind_source(assigns.bind))
+    assigns = assign(assigns, :source, assigns.source || bind_source(assigns.bind))
 
     ~H"""
     <div class="flex flex-col gap-1">
