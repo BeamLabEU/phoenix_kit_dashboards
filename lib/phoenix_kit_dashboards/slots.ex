@@ -136,9 +136,7 @@ defmodule PhoenixKitDashboards.Slots do
   """
   @spec module_tabs() :: [struct()]
   def module_tabs do
-    for %Slot{surface: :module_tab} = slot <- list(),
-        not is_nil(slot.parent_tab),
-        not is_nil(slot.path) do
+    for %Slot{surface: :module_tab} = slot <- list(), not is_nil(slot.parent_tab) do
       tab(slot)
     end
   rescue
@@ -152,7 +150,10 @@ defmodule PhoenixKitDashboards.Slots do
       id: tab_id(slot),
       label: slot.name,
       icon: slot.icon,
-      path: slot.path,
+      # Always under THIS package's own prefix, never inside the declaring
+      # module's namespace — see `PhoenixKitDashboards.Slot`. A two-segment
+      # path also cannot collide with our own dynamic `dashboards/:uuid`.
+      path: slot_path(slot),
       priority: slot.priority,
       level: :admin,
       # The slot's own module gates it — a CRM dashboard tab requires CRM's
@@ -179,6 +180,10 @@ defmodule PhoenixKitDashboards.Slots do
   def tab_id(%Slot{key: key}), do: String.to_atom("admin_dash_slot_" <> slug(key))
 
   defp slug(key), do: String.replace(key, ~r/[^a-zA-Z0-9]+/, "_")
+
+  @doc "The generated route path for a `:module_tab` slot."
+  @spec slot_path(Slot.t()) :: String.t()
+  def slot_path(%Slot{slug: slug}), do: "dashboards/at/" <> slug
 
   # ── Discovery ──────────────────────────────────────────────────────
 

@@ -10,8 +10,19 @@ defmodule PhoenixKitDashboards.Slot do
 
       def phoenix_kit_dashboard_slots do
         [%{key: "crm.overview", name: "CRM overview", surface: :module_tab,
-           parent_tab: :admin_crm, path: "crm/overview"}]
+           parent_tab: :admin_crm}]
       end
+
+  ## The URL belongs to this package, the placement to the declaring module
+
+  A `:module_tab` slot says WHERE in the sidebar its tab appears (`parent_tab`)
+  and this package decides the URL — always under its own `dashboards/` prefix.
+  A slot must not name a path inside the declaring module's namespace: routes
+  are generated per module in declaration order, so a `projects/dashboard`
+  would be swallowed by that module's own dynamic `projects/:id` route and
+  render its show page against the literal id `"dashboard"`. The sidebar
+  position comes from `parent_tab`, which is independent of the URL, so
+  nothing is lost by keeping the two separate.
 
   ## Declaring a slot is consent
 
@@ -30,7 +41,7 @@ defmodule PhoenixKitDashboards.Slot do
   | `name` | yes | Plain-language name shown in the control screen ("Project page"). |
   | `surface` | no | `:module_tab` (a sub-tab in the sidebar under `parent_tab`), `:record_tab` (a tab inside one record's page, rendered by the owning module), or `:admin_home`. Default `:module_tab`. |
   | `parent_tab` | for `:module_tab` | The sidebar tab id to hang the child under (`:admin_crm`). |
-  | `path` | for `:module_tab` | The route path for the generated tab, relative to `/admin`. |
+  | `slug` | no | Last URL segment for the generated tab. Defaults to the slot key. |
   | `module_key` | no | Gates the slot on that module's enablement + permission. |
   | `provides` | no | Context kinds this slot supplies at render, e.g. `["projects.project"]`. Empty = a context-free slot. |
   | `cardinality` | no | `:one` (default) or `:many` — whether several dashboards may be bound here and shown as tabs. |
@@ -56,7 +67,7 @@ defmodule PhoenixKitDashboards.Slot do
           icon: String.t(),
           surface: surface(),
           parent_tab: atom() | nil,
-          path: String.t() | nil,
+          slug: String.t(),
           module_key: String.t() | nil,
           provides: [String.t()],
           cardinality: :one | :many,
@@ -74,7 +85,7 @@ defmodule PhoenixKitDashboards.Slot do
             icon: "hero-rectangle-group",
             surface: :module_tab,
             parent_tab: nil,
-            path: nil,
+            slug: nil,
             module_key: nil,
             provides: [],
             cardinality: :one,
@@ -113,7 +124,7 @@ defmodule PhoenixKitDashboards.Slot do
          icon: map[:icon] || "hero-rectangle-group",
          surface: surface,
          parent_tab: normalize_parent(map[:parent_tab]),
-         path: map[:path] && to_string(map[:path]),
+         slug: slug(map[:slug] || key),
          module_key: map[:module_key] && to_string(map[:module_key]),
          provides: normalize_provides(map[:provides]),
          cardinality: one_of(map[:cardinality], @cardinalities, :one),
@@ -151,14 +162,12 @@ defmodule PhoenixKitDashboards.Slot do
 
   # ── Validation ─────────────────────────────────────────────────────
 
-  # A :module_tab slot generates a sidebar route, so it needs somewhere to
-  # hang and something to hang at. A :record_tab is rendered by the owning
-  # module inside its own page, and :admin_home is core's landing — neither
-  # generates a tab here, so neither needs a parent or a path.
+  # A :module_tab slot generates a sidebar tab, so it needs somewhere to hang.
+  # A :record_tab is rendered by the owning module inside its own page, and
+  # :admin_home is core's landing — neither generates a tab here.
   defp validate_surface(:module_tab, map) do
     cond do
       is_nil(map[:parent_tab]) -> {:error, :module_tab_needs_parent_tab}
-      is_nil(map[:path]) -> {:error, :module_tab_needs_path}
       not is_atom(map[:parent_tab]) -> {:error, {:invalid_parent_tab, map[:parent_tab]}}
       true -> :ok
     end
@@ -176,6 +185,15 @@ defmodule PhoenixKitDashboards.Slot do
   end
 
   defp normalize_surface(other), do: other
+
+  # URL-safe, and stable across restarts because it is derived from the key.
+  defp slug(value) do
+    value
+    |> to_string()
+    |> String.replace(~r/[^a-zA-Z0-9]+/, "-")
+    |> String.trim("-")
+    |> String.downcase()
+  end
 
   defp normalize_parent(nil), do: nil
   defp normalize_parent(atom) when is_atom(atom), do: atom

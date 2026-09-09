@@ -16,7 +16,6 @@ defmodule PhoenixKitDashboards.SlotsTest do
           name: "Test module place",
           surface: :module_tab,
           parent_tab: :admin_test,
-          path: "test/dashboard",
           provides: [],
           cardinality: :many
         },
@@ -37,9 +36,9 @@ defmodule PhoenixKitDashboards.SlotsTest do
         # No key at all.
         %{name: "Nameless"},
         # A module_tab with nowhere to hang.
-        %{key: "bad.no_parent", name: "No parent", surface: :module_tab, path: "x"},
-        # A module_tab with no path.
-        %{key: "bad.no_path", name: "No path", surface: :module_tab, parent_tab: :admin_x},
+        %{key: "bad.no_parent", name: "No parent", surface: :module_tab},
+        # A parent that is not a tab id.
+        %{key: "bad.bad_parent", name: "Bad parent", surface: :module_tab, parent_tab: "nope"},
         # Junk that is not a map at all.
         "not a map",
         # One VALID entry, which must survive its malformed siblings.
@@ -80,12 +79,9 @@ defmodule PhoenixKitDashboards.SlotsTest do
       assert slot.allow_personal == true
     end
 
-    test "a module_tab without a parent or a path is refused, not silently mounted somewhere" do
+    test "a module_tab without a parent is refused, not silently mounted somewhere" do
       assert {:error, :module_tab_needs_parent_tab} =
-               Slot.from_map(%{key: "a.b", name: "T", surface: :module_tab, path: "p"}, nil)
-
-      assert {:error, :module_tab_needs_path} =
-               Slot.from_map(%{key: "a.b", name: "T", surface: :module_tab, parent_tab: :x}, nil)
+               Slot.from_map(%{key: "a.b", name: "T", surface: :module_tab}, nil)
     end
 
     test "provides normalizes a bare kind and drops junk entries" do
@@ -121,7 +117,7 @@ defmodule PhoenixKitDashboards.SlotsTest do
 
       assert %Slot{name: "Fine"} = Slots.get("bad.ok")
       assert Slots.get("bad.no_parent") == nil
-      assert Slots.get("bad.no_path") == nil
+      assert Slots.get("bad.bad_parent") == nil
     end
 
     test "this module's own admin-home slot is always present" do
@@ -149,8 +145,19 @@ defmodule PhoenixKitDashboards.SlotsTest do
       tab = Enum.find(Slots.module_tabs(), &(&1.metadata.slot_key == "test.module"))
 
       assert tab.parent == :admin_test
-      assert tab.path == "test/dashboard"
       assert tab.live_view == {PhoenixKitDashboards.Web.SlotLive, :show}
+    end
+
+    test "a slot's route stays in THIS package's namespace, never the declaring module's" do
+      with_providers([GoodProvider])
+
+      tab = Enum.find(Slots.module_tabs(), &(&1.metadata.slot_key == "test.module"))
+
+      # `projects/dashboard` would be swallowed by the projects module's own
+      # dynamic `projects/:id` route and render its show page against the
+      # literal id "dashboard". Found on the box; this pins the fix.
+      assert tab.path == "dashboards/at/test-module"
+      refute String.starts_with?(tab.path, "test/")
     end
 
     test "tab ids are stable and unique per slot" do

@@ -145,8 +145,8 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
   defp slot_key_from_path(socket) do
     path = socket.assigns[:phoenix_kit_current_path] || ""
 
-    Enum.find_value(Slots.list(), fn %Slot{} = slot ->
-      slot.path && String.ends_with?(path, slot.path) && slot.key
+    Enum.find_value(Slots.list(), fn %Slot{surface: surface} = slot ->
+      surface == :module_tab and String.ends_with?(path, Slots.slot_path(slot)) and slot.key
     end)
   end
 
