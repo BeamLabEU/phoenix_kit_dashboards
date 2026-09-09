@@ -18,9 +18,10 @@ personal / system / role.
   `phoenix_kit_projects` additionally consumes the duck-typed
   `phoenix_kit_project_extensions/0` entry this module exports.
 - **Admin surface:** one visible tab **Dashboards** (`/admin/dashboards`,
-  priority 650, group `:admin_modules`) plus three hidden tabs —
-  `dashboards/new`, `dashboards/:uuid/edit` (form) and `dashboards/:uuid`
-  (builder).
+  priority 650, group `:admin_modules`) plus four hidden tabs —
+  `dashboards/new`, `dashboards/:uuid/edit` (form), `dashboards/places`
+  (the placement control screen) and `dashboards/:uuid` (builder) — plus one
+  generated tab per declared `:module_tab` slot at `dashboards/at/<slug>`.
 - **Module key** `"dashboards"`; settings prefix `dashboards_` (only
   `dashboards_enabled` today).
 
@@ -35,6 +36,12 @@ personal / system / role.
 - **No dependency on widget providers** — a provider must stay usable without
   this package installed.
 - **No one-click presets** — a new dashboard starts empty (see TODOs).
+- **No DDL for placements either** — they live in the `dashboards_placements`
+  setting and in each personal dashboard's own `config["slot"]`.
+- **No slot invented for a module that did not declare one.** Core groups
+  sub-tabs by parent id with no ownership check, so this module *could* inject
+  a tab anywhere; declaring a slot is the consent, and nothing appears without
+  one.
 - **No viewport/tier detection** — a grid dashboard opens on its first named
   layout, not on a layout picked from the device width.
 
@@ -181,6 +188,24 @@ Repo-local aliases:
   pre-mutates the struct in memory, so a plain `change/2` diffs against the
   materialized copy and silently skips the write when the edit equals the packed
   values.
+- A `:module_tab` slot's URL is built by THIS package
+  (`dashboards/at/<slug>`), never inside the declaring module's namespace.
+  Routes are generated per module in declaration order, so a slot naming
+  `projects/dashboard` is swallowed by that module's dynamic `projects/:id`
+  and renders its show page against the literal id `"dashboard"`. The sidebar
+  position comes from `parent_tab`, which is independent of the URL.
+- The slot catalog must be discovered through **`ModuleDiscovery`** (a beam
+  scan) as well as `ModuleRegistry` (a runtime `:persistent_term`). Slot tabs
+  feed `admin_tabs/0`, which core turns into ROUTES at **compile** time, when
+  the runtime registry is still empty — registry-only discovery produced no
+  slot routes at all, then memoized the empty catalog for the life of the BEAM.
+  `refresh/0` only caches a catalog built from a populated module list.
+- A **bind** lives on the layout item beside `settings`, never inside it: a
+  marker stored in a uuid-shaped settings field is eaten by validation and
+  makes the settings form display a value the widget is not using.
+- An instance saved before binds existed has no bind, and its stored id is
+  treated as a **pin**. Never reinterpret a saved selection as "this page's" —
+  that silently changes which record someone's board shows.
 
 ## Architecture
 
@@ -193,9 +218,15 @@ lib/phoenix_kit_dashboards/
   registry.ex                          # provider discovery + :persistent_term catalog
   widgets.ex, widgets/*.ex             # built-in widgets (note, clock, module stats)
   layout.ex, grid.ex, lattice.ex, sizing.ex, layouts.ex  # geometry + placement engine
+  slot.ex, slots.ex                    # the SLOT contract + its catalog (mirrors widget.ex/registry.ex)
+  placements.ex                        # dashboard -> slot -> audience, and resolution
+  binds.ex                             # host-side resolution of a widget's context subject
+  refresh.ex                           # the shared widget refresh loop (all four surfaces)
   paths.ex, gettext.ex
   web/                                 # DashboardsLive, DashboardFormLive, BuilderLive,
-                                       # ProjectDashboardLive, BuilderComponents, Helpers
+                                       # PlacesLive, SlotLive, AdminHomeLive,
+                                       # ProjectDashboardLive, BuilderComponents,
+                                       # SlotComponents, Helpers
 priv/static/assets/phoenix_kit_dashboards.js   # the js_sources/0 hook bundle
 ```
 
@@ -248,6 +279,50 @@ several densities and degrade when small. Each widget owns its own data loading.
 the other direction: it offers `phoenix_kit_projects` a read-only **Dashboard**
 tab (`Web.ProjectDashboardLive`) rendering one linked shared dashboard, picked
 via `config_schema` from `project_dashboard_options/0`.
+
+### Slot + placement contracts
+
+A **slot** is a place a dashboard can be shown; a **placement** binds a
+dashboard to one, for one audience. Both are the same duck-typed style as
+widgets — a module defines a zero-arity function returning plain maps.
+
+`phoenix_kit_dashboard_slots/0`:
+
+| Key | Required | Meaning |
+|---|---|---|
+| `key` | yes | Globally unique (`"projects.project"`). |
+| `name` | yes | Plain-language, shown on the Places screen. |
+| `surface` | no | `:module_tab` (a sidebar sub-tab), `:record_tab` (rendered by the owning module inside one record), `:admin_home`. Default `:module_tab`. |
+| `parent_tab` | for `:module_tab` | Sidebar tab id to hang under. The URL is this package's; a slot never names one. |
+| `slug` | no | Last URL segment (`dashboards/at/<slug>`). Defaults to the key. |
+| `module_key` | no | Gates the slot AND its generated tab on that module. |
+| `provides` | no | Context kinds supplied at render (`["projects.project"]`). |
+| `cardinality` | no | `:one` (default) or `:many` — several dashboards as tabs. |
+| `allow_personal`, `allow_blank`, `chrome`, `icon`, `description`, `priority` | no | Behaviour + presentation. |
+
+`phoenix_kit_dashboard_viewer_context/2` — `(kind, scope) -> id | nil`. Answers
+"which one is MINE" for a context kind. Only the module owning the record can
+answer it, and a shared role dashboard on a context-free page needs it: slot
+context alone cannot give each project manager their own project.
+
+A settings field may declare `context: "<kind>"`, marking it as holding a
+context subject. The field still stores a plain id; declaring the kind is what
+lets the host offer "the one this page is about" / "mine" and resolve either
+into it.
+
+**Resolution** (`Placements.resolve/3`) is personal → role → everyone. Tiers
+REPLACE rather than merge, and only one role may win — chosen by an explicit
+integer `priority` (lower wins), because a viewer with two matching roles
+would otherwise resolve by whatever order the role list came back in.
+
+**Binds** (`PhoenixKitDashboards.Binds`) resolve in the HOST, never the widget:
+the duck-typed contract forbids requiring widget changes, so the concrete value
+is written into the widget's own settings field before render and every
+existing widget works untouched. A layout item carries
+`"binds" => %{kind => "slot" | "viewer" | %{"pin" => id}}` beside `settings`.
+An unresolvable bind renders an explanatory card — never hidden (reads as a
+deleted widget, leaves a hole in the grid) and never a fallback record (that is
+how one project's numbers reach another's screen).
 
 ### Data model
 
