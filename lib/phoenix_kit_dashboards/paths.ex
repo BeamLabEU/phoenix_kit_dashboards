@@ -25,4 +25,14 @@ defmodule PhoenixKitDashboards.Paths do
   @doc "The settings/edit page for a single dashboard."
   @spec edit(String.t()) :: String.t()
   def edit(uuid), do: Routes.path("#{@base}/#{uuid}/edit")
+
+  @doc """
+  The **Places** page — the one screen listing every slot a dashboard can be
+  shown in, and which dashboard fills each for whom.
+
+  Named "places" rather than "slots" or "placements" because the URL is user
+  visible and the UI never uses the internal vocabulary.
+  """
+  @spec places() :: String.t()
+  def places, do: Routes.path("#{@base}/places")
 end

@@ -57,6 +57,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   import PhoenixKitDashboards.Web.BuilderComponents
 
   alias Phoenix.LiveView.JS
+  alias PhoenixKitDashboards.Binds
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Lattice
   alias PhoenixKitDashboards.Layout
@@ -87,7 +88,14 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
      # The layout id currently in inline-rename mode (nil = none).
      |> assign(:renaming_layout, nil)
      # QoL: show the empty grid cells while designing (session-local toggle).
-     |> assign(:show_grid_lines, false)}
+     |> assign(:show_grid_lines, false)
+     # PREVIEW CONTEXT. A dashboard is built here, in the library, before
+     # anyone says where it will be shown — so a widget bound to "the one this
+     # page is about" has nothing to resolve and would show its placeholder
+     # while you design. Choosing a subject here stands in for the page it will
+     # eventually sit on. Session-local and never persisted: it is a lens on
+     # the canvas, not a property of it.
+     |> assign(:preview_context, %{})}
   end
 
   @impl true
@@ -493,6 +501,18 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     {:noreply, assign(socket, :settings_instance, nil)}
   end
 
+  defp do_handle_event("preview_as", %{"kind" => kind, "value" => value}, socket)
+       when is_binary(kind) do
+    context =
+      if is_binary(value) and value != "" do
+        Map.put(socket.assigns.preview_context, kind, value)
+      else
+        Map.delete(socket.assigns.preview_context, kind)
+      end
+
+    {:noreply, assign(socket, :preview_context, context)}
+  end
+
   defp do_handle_event("save_settings", params, socket) do
     case socket.assigns.settings_instance do
       nil -> {:noreply, socket}
@@ -533,6 +553,21 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   # No open settings modal (e.g. a double submit racing close_settings) is a
   # no-op — otherwise configure_widget would write the unchanged layout and log
   # a phantom "widget_configured" activity for a nil instance.
+  # Where each context-bound field takes its value from ("slot" / "viewer" /
+  # "pin"), submitted by the settings form alongside the plain settings. Only
+  # string keys and string values survive — these are attacker-controlled form
+  # params, and `Binds` normalizes the source itself.
+  defp maybe_put_binds(attrs, binds) when is_map(binds) do
+    clean =
+      binds
+      |> Enum.filter(fn {k, v} -> is_binary(k) and is_binary(v) end)
+      |> Map.new()
+
+    if clean == %{}, do: attrs, else: Map.put(attrs, :binds, clean)
+  end
+
+  defp maybe_put_binds(attrs, _binds), do: attrs
+
   defp save_settings(socket, instance_id, params) do
     grid? = Dashboard.layout_mode(socket.assigns.dashboard) == "grid"
 
@@ -540,6 +575,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
       %{settings: params["settings"] || %{}}
       |> then(&if grid?, do: &1, else: maybe_put_view(&1, params["view"]))
       |> maybe_put_min_override(params["min_override"])
+      |> maybe_put_binds(params["binds"])
 
     # On the grid the view is a PER-LAYOUT setting (stored on the active
     # layout's placement); everything else stays instance-level. `is_binary`
@@ -947,6 +983,12 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         </div>
       </div>
 
+      <.preview_bar
+        :if={Binds.required_kinds(@dashboard.layout) != []}
+        kinds={Binds.required_kinds(@dashboard.layout)}
+        context={@preview_context}
+      />
+
       <div class="relative flex flex-1 min-h-0">
         <.grid
           dashboard={@dashboard}
@@ -954,6 +996,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           active_layout={@active_layout}
           renaming_layout={@renaming_layout}
           show_grid_lines={@show_grid_lines}
+          context={@preview_context}
         />
         <.catalog_drawer catalog={@catalog} />
       </div>

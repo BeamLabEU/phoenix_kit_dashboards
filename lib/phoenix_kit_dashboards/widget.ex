@@ -266,7 +266,15 @@ defmodule PhoenixKitDashboards.Widget do
         type: field_type(field[:type] || field["type"]),
         label: field[:label] || field["label"],
         options: List.wrap(field[:options] || field["options"]),
-        default: Map.get(field, :default, Map.get(field, "default"))
+        default: Map.get(field, :default, Map.get(field, "default")),
+        # Marks this field as holding a CONTEXT SUBJECT of the named kind
+        # (e.g. "projects.project"). Purely declarative: the field still
+        # stores and reads an ordinary id, but declaring the kind lets the
+        # host offer "the project this page is about" / "mine" as sources
+        # instead of only a fixed pick, and lets it resolve the bind into
+        # this field before render. Absent = an ordinary setting.
+        # See `PhoenixKitDashboards.Binds`.
+        context: context_kind(field[:context] || field["context"])
       }
     end
   end
@@ -275,6 +283,10 @@ defmodule PhoenixKitDashboards.Widget do
 
   defp field_type(t) when t in @valid_field_types, do: t
   defp field_type(_), do: :string
+
+  defp context_kind(kind) when is_binary(kind) and kind != "", do: kind
+  defp context_kind(kind) when is_atom(kind) and not is_nil(kind), do: to_string(kind)
+  defp context_kind(_), do: nil
 
   # Refresh interval is clamped to a 1s floor so a provider can't accidentally
   # pin the host into a tight re-query loop.

@@ -73,6 +73,10 @@ defmodule PhoenixKitDashboards do
     # module is picked up without a BEAM restart (core has no module-toggle
     # event to hook, so this refreshes on our own toggle at least).
     PhoenixKitDashboards.Registry.refresh()
+    # Slots come and go with their modules exactly like widgets do, so the two
+    # catalogs must be rebuilt together — a provider enabled alongside this
+    # module would otherwise contribute widgets but no places to put them.
+    PhoenixKitDashboards.Slots.refresh()
     result
   end
 
@@ -102,6 +106,13 @@ defmodule PhoenixKitDashboards do
 
   @impl PhoenixKit.Module
   def admin_tabs do
+    own_tabs() ++ PhoenixKitDashboards.Slots.module_tabs()
+  end
+
+  # This module's OWN pages. The slot-generated tabs are appended separately by
+  # `admin_tabs/0` so the two lists stay legible: these are fixed, those are
+  # whatever the installed modules currently declare.
+  defp own_tabs do
     [
       %Tab{
         id: :admin_dashboards,
@@ -146,6 +157,22 @@ defmodule PhoenixKitDashboards do
         visible: false,
         live_view: {PhoenixKitDashboards.Web.DashboardFormLive, :edit}
       },
+      # Static, so it MUST precede the dynamic "dashboards/:uuid" below or the
+      # builder route swallows it (same landmine as "dashboards/new").
+      %Tab{
+        id: :admin_dashboards_places,
+        label: "Places",
+        gettext_backend: PhoenixKitDashboards.Gettext,
+        gettext_domain: "default",
+        icon: "hero-rectangle-group",
+        path: "dashboards/places",
+        priority: 652,
+        level: :admin,
+        permission: @module_key,
+        parent: :admin_dashboards,
+        visible: false,
+        live_view: {PhoenixKitDashboards.Web.PlacesLive, :index}
+      },
       # The per-dashboard builder. Dynamic :uuid segment is spliced verbatim
       # into the generated route.
       %Tab{
@@ -189,7 +216,9 @@ defmodule PhoenixKitDashboards do
       dgettext_noop("default", "Dashboards"),
       dgettext_noop("default", "New Dashboard"),
       dgettext_noop("default", "Dashboard Settings"),
-      dgettext_noop("default", "Dashboard Builder")
+      dgettext_noop("default", "Dashboard Builder"),
+      dgettext_noop("default", "Places"),
+      dgettext_noop("default", "Admin home")
     ]
   end
 
@@ -231,6 +260,63 @@ defmodule PhoenixKitDashboards do
   """
   @spec phoenix_kit_widgets() :: [map()]
   def phoenix_kit_widgets, do: PhoenixKitDashboards.Widgets.builtin()
+
+  # ── Slot provider ──────────────────────────────────────────────────
+
+  @doc """
+  The places THIS module offers, through the same duck-typed
+  `phoenix_kit_dashboard_slots/0` contract any module uses (see
+  `PhoenixKitDashboards.Slot`).
+
+  Only one: the **admin home**. Core's `/admin` landing belongs to core, not to
+  a module, so this package declares the place and core asks
+  `admin_home_dashboard/1` whether anything fills it — a module never reaches
+  into core's page, and core keeps no dependency on this package.
+
+  `cardinality: :many` because the owner asked for several home boards ("Site
+  health", "User activity", "Sales") shown as tabs. `allow_blank: false`
+  because an empty home reads as a broken install, and `chrome: :view` because
+  the home is a landing, not a workspace — editing happens in the builder.
+  """
+  @spec phoenix_kit_dashboard_slots() :: [map()]
+  def phoenix_kit_dashboard_slots do
+    [
+      %{
+        key: "core.admin_home",
+        name: "Admin home",
+        description: "The first page you see after signing in",
+        icon: "hero-home",
+        surface: :admin_home,
+        cardinality: :many,
+        allow_personal: true,
+        allow_blank: false,
+        chrome: :view,
+        priority: 10
+      }
+    ]
+  end
+
+  @doc """
+  The dashboards to render on `/admin` for this viewer, and which audience rule
+  won.
+
+  Core calls this duck-typed (`Code.ensure_loaded?` + `function_exported?`), so
+  `/admin` keeps working untouched when this module is absent or disabled — and
+  falls back to its own built-in overview whenever the answer is empty. That
+  fallback is the reason an optional module can own the landing page at all.
+  """
+  @spec admin_home_dashboards(map() | nil) :: {atom(), [struct()]}
+  def admin_home_dashboards(scope) do
+    if enabled?() do
+      PhoenixKitDashboards.Placements.resolve("core.admin_home", scope)
+    else
+      {:none, []}
+    end
+  rescue
+    _ -> {:none, []}
+  catch
+    :exit, _ -> {:none, []}
+  end
 
   # ── Project-extension provider ─────────────────────────────────────
 

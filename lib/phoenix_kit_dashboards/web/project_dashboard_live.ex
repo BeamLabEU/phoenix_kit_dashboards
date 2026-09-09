@@ -43,6 +43,7 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
 
   alias PhoenixKit.Users.Auth
   alias PhoenixKit.Users.Auth.Scope
+  alias PhoenixKitDashboards.Binds
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Layouts
   alias PhoenixKitDashboards.Paths
@@ -57,6 +58,12 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   def mount(_params, session, socket) do
     socket =
       socket
+      # THE context this tab supplies. Without it a dashboard shown inside
+      # Project A and Project B rendered identically — every project-flavoured
+      # widget fell back to whatever uuid was typed into its own settings when
+      # it was placed. The tab has always received the project uuid in its
+      # session; it simply never passed it down.
+      |> assign(:context, project_context(session))
       |> assign(:id_prefix, @id_prefix)
       |> assign_embed_identity(session)
       |> load_dashboard(session["config"])
@@ -115,10 +122,12 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
           |> Dashboards.resolve_items(socket.assigns.active_layout)
           |> Map.new(fn {item, p} -> {item["id"], p} end)
 
+        context = socket.assigns.context
+
         dashboard.layout
         |> Enum.reduce(
           Process.get(:pk_refresh_at, %{}),
-          &refresh_due(&1, &2, now, scope, placements)
+          &refresh_due(&1, &2, now, scope, placements, context)
         )
         |> then(&Process.put(:pk_refresh_at, &1))
 
@@ -195,6 +204,7 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
           empty={@dashboard.layout == []}
           readonly
           id_prefix={@id_prefix}
+          context={@context}
         />
       </div>
       <div
@@ -207,6 +217,7 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
           scope={@phoenix_kit_current_scope}
           readonly
           id_prefix={@id_prefix}
+          context={@context}
         />
       </div>
     </div>
@@ -322,18 +333,24 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
 
   defp any_live_widget?(_), do: false
 
-  defp refresh_due(inst, acc, now, scope, placements) do
+  defp refresh_due(inst, acc, now, scope, placements, context) do
     case Registry.get(inst["widget_key"]) do
       %Widget{refresh_interval: ms} = widget when is_integer(ms) ->
-        if now >= Map.get(acc, inst["id"], now) and Registry.visible_for_scope?(widget, scope) do
+        {settings, unresolved} = Binds.resolve(inst, context, scope)
+
+        # An unresolved bind is showing a placeholder card, not a mounted
+        # LiveComponent — updating it would target a component that isn't there.
+        if now >= Map.get(acc, inst["id"], now) and unresolved == [] and
+             Registry.visible_for_scope?(widget, scope) do
           p = placements[inst["id"]] || pixel_cells(inst)
 
           send_update(widget.component,
             id: inst["id"],
-            settings: inst["settings"] || %{},
+            settings: settings,
             view: (placements[inst["id"]] || %{})["view"] || inst["view"],
             size: %{w: p["w"], h: p["h"]},
-            scope: scope
+            scope: scope,
+            context: context
           )
 
           Map.put(acc, inst["id"], now + ms)
@@ -343,6 +360,16 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
 
       _ ->
         acc
+    end
+  end
+
+  # The hub passes the project uuid in the embed session (the contract in the
+  # moduledoc). Keyed by CONTEXT KIND, not by a bare field name, so a second
+  # record type later cannot be mistaken for a project.
+  defp project_context(session) do
+    case session["project_uuid"] do
+      uuid when is_binary(uuid) and uuid != "" -> %{"projects.project" => uuid}
+      _ -> %{}
     end
   end
 end
