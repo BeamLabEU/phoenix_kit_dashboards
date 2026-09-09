@@ -97,8 +97,11 @@ defmodule PhoenixKitDashboards.Slots do
   @doc "Rebuild the slot catalog from every discovered provider and re-cache it."
   @spec refresh() :: %{String.t() => Slot.t()}
   def refresh do
+    {modules, complete?} = provider_modules()
+
     catalog =
-      provider_slots()
+      modules
+      |> provider_slots()
       |> Enum.reduce(%{}, fn slot, acc ->
         if Map.has_key?(acc, slot.key) do
           Logger.warning(
@@ -112,7 +115,11 @@ defmodule PhoenixKitDashboards.Slots do
         end
       end)
 
-    :persistent_term.put(@pt_key, catalog)
+    # Only CACHE a catalog built from a complete module list. `admin_tabs/0`
+    # runs at router-COMPILE time, when the runtime registry is still empty —
+    # memoizing that answer would pin an empty catalog for the life of the
+    # BEAM and no module's slots would ever appear.
+    if complete?, do: :persistent_term.put(@pt_key, catalog)
     catalog
   end
 
@@ -175,8 +182,8 @@ defmodule PhoenixKitDashboards.Slots do
 
   # ── Discovery ──────────────────────────────────────────────────────
 
-  defp provider_slots do
-    provider_modules()
+  defp provider_slots(modules) do
+    modules
     |> Enum.flat_map(fn module ->
       module
       |> safe_slots()
@@ -184,25 +191,58 @@ defmodule PhoenixKitDashboards.Slots do
     end)
   end
 
+  # Returns `{modules, complete?}`. Two discovery sources, deliberately:
+  #
+  #   * `ModuleRegistry.all_modules/0` — the runtime list, a `:persistent_term`
+  #     populated when the app boots.
+  #   * `ModuleDiscovery.discover_external_modules/0` — a beam scan, which is
+  #     what core itself uses to generate routes and which therefore works at
+  #     COMPILE time, when the runtime list is still empty.
+  #
+  # The second is not redundant. Slot tabs feed `admin_tabs/0`, and core turns
+  # that into ROUTES at compile time — so a slot discovered only at runtime
+  # would render in the sidebar and 404 when clicked. Using the same source
+  # core uses is what keeps the tab and its route in step.
+  #
+  # `complete?` says whether discovery actually saw the installed modules, so
+  # the caller knows whether this answer is worth caching.
   defp provider_modules do
-    discovered =
-      if Code.ensure_loaded?(PhoenixKit.ModuleRegistry) do
-        PhoenixKit.ModuleRegistry.all_modules()
-      else
-        []
-      end
+    registered = safe_registry_modules()
+    scanned = safe_scanned_modules()
+    discovered = Enum.uniq(registered ++ scanned)
 
-    ([PhoenixKitDashboards | discovered] ++ config_providers())
-    |> Enum.uniq()
-    # ensure_loaded? BEFORE function_exported?: on a cold VM a discovered
-    # module that has not been called yet is not loaded, and
-    # function_exported?/3 answers false without loading it — silently
-    # dropping that module's slots. Same trap the widget registry documents.
-    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, @provider_callback, 0)))
+    providers =
+      ([PhoenixKitDashboards | discovered] ++ config_providers())
+      |> Enum.uniq()
+      # ensure_loaded? BEFORE function_exported?: on a cold VM a discovered
+      # module that has not been called yet is not loaded, and
+      # function_exported?/3 answers false without loading it — silently
+      # dropping that module's slots. Same trap the widget registry documents.
+      |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, @provider_callback, 0)))
+
+    {providers, discovered != []}
   rescue
     e ->
       Logger.warning("[Dashboards] Slot provider discovery failed: #{Exception.message(e)}")
-      [PhoenixKitDashboards]
+      {[PhoenixKitDashboards], false}
+  end
+
+  defp safe_registry_modules do
+    if Code.ensure_loaded?(PhoenixKit.ModuleRegistry),
+      do: PhoenixKit.ModuleRegistry.all_modules(),
+      else: []
+  rescue
+    _ -> []
+  end
+
+  defp safe_scanned_modules do
+    if Code.ensure_loaded?(PhoenixKit.ModuleDiscovery),
+      do: PhoenixKit.ModuleDiscovery.discover_external_modules(),
+      else: []
+  rescue
+    _ -> []
+  catch
+    :exit, _ -> []
   end
 
   defp config_providers do

@@ -164,6 +164,34 @@ defmodule PhoenixKitDashboards.SlotsTest do
     end
   end
 
+  describe "cache freshness" do
+    test "a catalog built with no discovered modules is NOT cached" do
+      # `admin_tabs/0` runs at router-COMPILE time, when the runtime module
+      # registry is an empty `:persistent_term`. Caching that answer pinned an
+      # empty catalog for the life of the BEAM: no module's slots appeared in
+      # the sidebar, and the routes core generates from those tabs were never
+      # created either. Found on the box, not by a test — hence this one.
+      :persistent_term.erase({Slots, :catalog})
+
+      # Simulate the compile-time condition: no registered modules, no beams to
+      # scan for, and no configured providers.
+      Application.put_env(:phoenix_kit_dashboards, :slot_providers, [])
+      Slots.refresh()
+
+      # Whatever it computed, it must not have been memoized — the next read
+      # has to try discovery again rather than serve the bare answer forever.
+      assert :persistent_term.get({Slots, :catalog}, :miss) == :miss or
+               map_size(:persistent_term.get({Slots, :catalog}, %{})) > 0
+    end
+
+    test "a catalog built from real discovery IS cached" do
+      with_providers([GoodProvider])
+
+      assert %{} = cached = :persistent_term.get({Slots, :catalog}, :miss)
+      assert Map.has_key?(cached, "test.module")
+    end
+  end
+
   describe "provides?/2" do
     test "answers only for kinds actually declared" do
       {:ok, slot} =
