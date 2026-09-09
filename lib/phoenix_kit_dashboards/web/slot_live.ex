@@ -40,15 +40,15 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
     {:ok, assign(socket, id_prefix: "pk-slot-", context: %{}, active_index: 0)}
   end
 
-  # The slot key comes from the tab's metadata rather than the URL, so a slot's
-  # path is whatever the declaring module chose and no route parsing is needed.
+  # Which slot this page is. The tab's `metadata` carries the key when core
+  # assigns the current tab; otherwise the URI is matched against the declared
+  # slots' generated paths. The URI is taken from `handle_params/3` rather than
+  # an assign because it is always present and always current.
   @impl true
-  def handle_params(_params, _uri, socket) do
-    slot_key = slot_key_from_tab(socket)
-
+  def handle_params(_params, uri, socket) do
     {:noreply,
      socket
-     |> assign(:slot_key, slot_key)
+     |> assign(:slot_key, slot_key_from(socket, uri))
      |> load_slot()}
   end
 
@@ -133,18 +133,24 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
     )
   end
 
-  defp slot_key_from_tab(socket) do
+  defp slot_key_from(socket, uri) do
     case socket.assigns[:phoenix_kit_current_tab] do
       %{metadata: %{slot_key: key}} when is_binary(key) -> key
-      _ -> slot_key_from_path(socket)
+      _ -> slot_key_from_path(path_of(uri, socket))
     end
   end
 
-  # Fallback for cores that do not assign the current tab: match the request
-  # path against the declared slots' own paths.
-  defp slot_key_from_path(socket) do
-    path = socket.assigns[:phoenix_kit_current_path] || ""
+  defp path_of(uri, socket) when is_binary(uri) do
+    URI.parse(uri).path || socket.assigns[:url_path] || ""
+  rescue
+    _ -> socket.assigns[:url_path] || ""
+  end
 
+  defp path_of(_uri, socket), do: socket.assigns[:url_path] || ""
+
+  # Match the request path against the declared slots' generated paths. Only
+  # `:module_tab` slots have one — the others are rendered by their host.
+  defp slot_key_from_path(path) do
     Enum.find_value(Slots.list(), fn %Slot{surface: surface} = slot ->
       surface == :module_tab and String.ends_with?(path, Slots.slot_path(slot)) and slot.key
     end)
