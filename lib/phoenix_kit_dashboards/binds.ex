@@ -86,13 +86,27 @@ defmodule PhoenixKitDashboards.Binds do
         widget = Registry.get(item["widget_key"])
 
         Enum.reduce(binds, {settings, []}, fn {kind, source}, {acc, missing} ->
-          field = settings_field(widget, kind)
+          value = resolve_one(kind, source, context, scope)
 
-          case resolve_one(kind, source, context, scope) do
-            nil when is_binary(field) -> {Map.put(acc, field, nil), [kind | missing]}
-            nil -> {acc, [kind | missing]}
-            value when is_binary(field) -> {Map.put(acc, field, value), missing}
-            _value -> {acc, missing}
+          case settings_field(widget, kind) do
+            field when is_binary(field) and is_binary(value) ->
+              {Map.put(acc, field, value), missing}
+
+            field when is_binary(field) ->
+              # Blank the field as well as reporting it: leaving the stale id
+              # in place would render the previous record behind the
+              # placeholder the moment anything stopped honouring `missing`.
+              {Map.put(acc, field, nil), [kind | missing]}
+
+            _no_field ->
+              # The bind names a kind no settings field claims — a provider
+              # renamed a field, or the widget was swapped for one that does
+              # not take this subject. Treat it as UNRESOLVED, never as
+              # "resolved, nothing to do": the widget would keep whatever id
+              # was pinned into its settings before, and quietly render
+              # another record on this page. That leak is the single failure
+              # this whole mechanism exists to prevent.
+              {acc, [kind | missing]}
           end
         end)
         |> then(fn {acc, missing} -> {acc, Enum.reverse(missing)} end)
@@ -167,18 +181,32 @@ defmodule PhoenixKitDashboards.Binds do
 
   defp resolve_one(kind, "viewer", _context, scope), do: viewer_value(kind, scope)
 
-  defp resolve_one(_kind, %{"pin" => id}, _context, _scope) when is_binary(id), do: id
-  defp resolve_one(_kind, {"pin", id}, _context, _scope) when is_binary(id), do: id
+  defp resolve_one(_kind, %{"pin" => id}, _context, _scope), do: pin(id)
+  defp resolve_one(_kind, {"pin", id}, _context, _scope), do: pin(id)
+
+  # A bare id is a pin, matching `normalize_source/1`. Kept in step with it
+  # deliberately: the two disagreeing would make a stored bind mean one thing
+  # when written and another when read.
+  defp resolve_one(_kind, id, _context, _scope) when is_binary(id), do: pin(id)
   defp resolve_one(_kind, _source, _context, _scope), do: nil
 
-  defp get_context(context, kind) when is_map(context) do
-    case Map.get(context, kind) || Map.get(context, String.to_atom(kind)) do
+  # An empty pin is not a selection. Treating `""` as resolved handed the
+  # widget a blank id with no placeholder — it would render its own
+  # "nothing selected" state where the honest answer is "this is not
+  # configured".
+  defp pin(id) when is_binary(id) and id != "", do: id
+  defp pin(_id), do: nil
+
+  # STRING keys only. Looking the kind up as an atom too would build atoms from
+  # values that originate in layout JSON — unbounded growth of a table that is
+  # never collected, and `String.to_atom/1` raises `SystemLimitError` (not the
+  # `ArgumentError` a rescue here would catch) once a kind exceeds 255 bytes.
+  # Every context map in this package is built with string keys.
+  defp get_context(context, kind) when is_map(context) and is_binary(kind) do
+    case Map.get(context, kind) do
       value when is_binary(value) and value != "" -> value
       _ -> nil
     end
-  rescue
-    # An unknown atom key simply is not present.
-    ArgumentError -> nil
   end
 
   defp get_context(_context, _kind), do: nil
@@ -228,23 +256,33 @@ defmodule PhoenixKitDashboards.Binds do
   # declaring `context: "<kind>"` on it in `settings_schema`; absent that, a
   # field whose key matches the kind's last segment is used, which is what
   # every current provider already names it ("project").
-  defp settings_field(%Widget{settings_schema: schema}, kind) do
+  defp settings_field(%Widget{settings_schema: schema}, kind)
+       when is_list(schema) and is_binary(kind) do
     tail = kind |> String.split(".") |> List.last()
 
-    declared = Enum.find(schema, fn field -> field[:context] == kind end)
-
-    cond do
-      declared -> declared.key
-      field = Enum.find(schema, &(&1.key == tail)) -> field.key
-      field = Enum.find(schema, &(&1.key == tail <> "_uuid")) -> field.key
-      true -> nil
+    # A DECLARED field always wins. The name-matching below is a courtesy for
+    # providers that have not declared `context:` yet, and is deliberately
+    # exact — a fuzzy match that picked the wrong field would write the
+    # subject into one key while the widget read another.
+    case Enum.find(schema, &(&1[:context] == kind)) do
+      %{key: key} -> key
+      _ -> Enum.find_value([tail, tail <> "_uuid", tail <> "_id"], &named_field(schema, &1))
     end
   end
 
   defp settings_field(_widget, _kind), do: nil
 
+  defp named_field(schema, name) do
+    case Enum.find(schema, &(&1.key == name)) do
+      %{key: key} -> key
+      _ -> nil
+    end
+  end
+
   defp normalize_source("slot"), do: "slot"
   defp normalize_source("viewer"), do: "viewer"
+  defp normalize_source(:slot), do: "slot"
+  defp normalize_source(:viewer), do: "viewer"
   defp normalize_source(%{"pin" => id}) when is_binary(id), do: %{"pin" => id}
   defp normalize_source({"pin", id}) when is_binary(id), do: %{"pin" => id}
   defp normalize_source(id) when is_binary(id), do: %{"pin" => id}

@@ -128,6 +128,76 @@ defmodule PhoenixKitDashboards.BindsTest do
     end
   end
 
+  describe "the leak cases a review panel found" do
+    test "a bind whose kind matches NO settings field is unresolved, not silently ignored" do
+      # The widget's field is "thing"; this bind names a kind nothing claims.
+      # Previously the bind resolved, wrote nowhere, and reported no problem —
+      # so the widget kept whatever id was already pinned in its settings and
+      # rendered ANOTHER record on this page. That is the exact leak the whole
+      # mechanism exists to prevent.
+      item = %{
+        "id" => "w1",
+        "widget_key" => "test.thing",
+        "settings" => %{"thing" => "old-record"},
+        "binds" => %{"unclaimed.kind" => "slot"}
+      }
+
+      {settings, unresolved} = Binds.resolve(item, %{"unclaimed.kind" => "new"}, nil)
+
+      assert unresolved == ["unclaimed.kind"]
+      # The stale id is still in settings, but `unresolved` means the host
+      # draws a placeholder instead of mounting the widget with it.
+      assert settings["thing"] == "old-record"
+    end
+
+    test "an unresolvable bind BLANKS its field rather than leaving the old id" do
+      item = item(%{"test.thing" => "slot"}, %{"thing" => "old-record"})
+      {settings, unresolved} = Binds.resolve(item, %{}, nil)
+
+      assert unresolved == ["test.thing"]
+      assert settings["thing"] == nil
+    end
+
+    test "an empty pin is not a selection" do
+      {_settings, unresolved} =
+        Binds.resolve(item(%{"test.thing" => %{"pin" => ""}}), %{}, nil)
+
+      assert unresolved == ["test.thing"]
+    end
+
+    test "a bare-string bind reads as a pin, matching how put_bind writes one" do
+      # put_bind/3 normalizes a bare id to %{"pin" => id}; resolution has to
+      # agree, or a stored bind would mean one thing written and another read.
+      {settings, unresolved} = Binds.resolve(item(%{"test.thing" => "abc"}), %{}, nil)
+
+      assert unresolved == []
+      assert settings["thing"] == "abc"
+    end
+
+    test "a very long context kind does not blow the atom table or crash" do
+      # The kind was previously looked up as an atom too, which raises
+      # SystemLimitError past 255 bytes — and grew the atom table from values
+      # that originate in layout JSON.
+      long = String.duplicate("a", 300)
+
+      assert {_settings, [^long]} = Binds.resolve(item(%{long => "slot"}), %{}, nil)
+    end
+
+    test "a bind on an unknown widget is unresolved rather than a crash" do
+      # No widget means no settings field to write into, and the board must
+      # still render — this runs inside the render path, so raising here would
+      # take the whole dashboard down.
+      {_settings, unresolved} =
+        Binds.resolve(
+          %{"id" => "w1", "widget_key" => "nope.unknown", "binds" => %{"a.b" => "slot"}},
+          %{"a.b" => "v"},
+          nil
+        )
+
+      assert unresolved == ["a.b"]
+    end
+  end
+
   describe "put_bind/3" do
     test "setting then clearing leaves no binds key at all" do
       bound = Binds.put_bind(%{"id" => "w1"}, "test.thing", "slot")

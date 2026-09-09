@@ -74,6 +74,13 @@ defmodule PhoenixKitDashboards.Placements do
     @setting_key
     |> Settings.get_setting(nil)
     |> decode()
+  rescue
+    # The docstring promises this degrades rather than crashes, and a settings
+    # read can raise when the database is unreachable — on a page that is
+    # otherwise perfectly able to render its fallback.
+    _ -> %{}
+  catch
+    :exit, _ -> %{}
   end
 
   @doc "Shared placements for one slot, ordered by position."
@@ -103,22 +110,23 @@ defmodule PhoenixKitDashboards.Placements do
     user_uuid = user_uuid(scope)
 
     cond do
-      is_nil(slot) ->
-        {:none, []}
-
-      match = personal_match(slot, user_uuid) ->
-        {:personal, cap(match, slot, opts)}
-
-      match = role_match(slot_key, scope) ->
-        {:role, cap(match, slot, opts)}
-
-      match = everyone_match(slot_key) ->
-        {:everyone, cap(match, slot, opts)}
-
-      true ->
-        {:none, []}
+      is_nil(slot) -> {:none, []}
+      match = personal_match(slot, user_uuid) -> tier(:personal, match, slot, opts)
+      match = role_match(slot_key, scope) -> tier(:role, match, slot, opts)
+      match = everyone_match(slot_key) -> tier(:everyone, match, slot, opts)
+      true -> {:none, []}
     end
   end
+
+  # A tier that HAS a placement answers, even when every dashboard it names has
+  # been deleted — `{tier, []}`, which the caller renders as the slot's empty
+  # state and `health/1` reports as a broken placement.
+  #
+  # Falling through to the next tier instead looks helpful and is not: deleting
+  # the Project-managers dashboard would silently show every manager the
+  # company-wide board. That is a visibility change nobody asked for, and it
+  # happens quietly. Tiers replace; a tier that matched is the answer.
+  defp tier(name, {:placed, dashboards}, slot, opts), do: {name, cap(dashboards, slot, opts)}
 
   @doc """
   The single dashboard for a slot, or `nil`.
@@ -147,7 +155,7 @@ defmodule PhoenixKitDashboards.Placements do
       d.scope == "personal" and d.owner_user_uuid == user_uuid and slot_of(d) == slot_key
     end)
     |> Enum.sort_by(& &1.position)
-    |> presence()
+    |> placed()
   rescue
     _ -> nil
   end
@@ -165,8 +173,7 @@ defmodule PhoenixKitDashboards.Placements do
       # the winning role so a :many slot's tabs do not shuffle.
       |> Enum.sort_by(&{priority(&1), position(&1)})
       |> take_winning_role()
-      |> load_all()
-      |> presence()
+      |> placed_from()
     end
   end
 
@@ -185,8 +192,7 @@ defmodule PhoenixKitDashboards.Placements do
     |> for_slot()
     |> Enum.filter(&(&1["audience"] == "everyone"))
     |> Enum.sort_by(&position/1)
-    |> load_all()
-    |> presence()
+    |> placed_from()
   end
 
   defp load_all(placements) do
@@ -195,11 +201,18 @@ defmodule PhoenixKitDashboards.Placements do
     |> Enum.reject(&is_nil/1)
   end
 
-  # An empty list means "this tier had no placement", which must fall through
-  # to the next tier. A tier whose placements all point at deleted dashboards
-  # also falls through rather than rendering an empty slot.
-  defp presence([]), do: nil
-  defp presence(list), do: list
+  # `nil` means "this tier declares nothing here" — fall through to the next.
+  # `{:placed, dashboards}` means "this tier answers", and the list may be
+  # empty because every dashboard it named has since been deleted. Collapsing
+  # the two was the bug: a deleted role dashboard silently promoted the
+  # company-wide board to that role's members.
+  defp placed([]), do: nil
+  defp placed(list), do: {:placed, list}
+
+  # From raw placements: the PLACEMENTS decide whether this tier answers, the
+  # loaded dashboards only decide what it shows.
+  defp placed_from([]), do: nil
+  defp placed_from(placements), do: {:placed, load_all(placements)}
 
   defp cap(dashboards, slot, opts) do
     if Keyword.get(opts, :limit_one, false) or not Slot.many?(slot) do
