@@ -21,7 +21,6 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
       actor_opts: 1,
       user_role_uuids: 1,
       scope_label: 1,
-      translate_catalog: 1,
       viewable_by?: 2,
       manageable_by?: 2
     ]
@@ -114,7 +113,11 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
   # name, and falls back to the raw key only when the declaring module is gone
   # — which is itself the useful signal.
   defp place_label(%{label: label}) when is_binary(label) and label != "", do: label
-  defp place_label(%{slot: %{name: name}}), do: translate_catalog(name)
+  # Through the DECLARING module's catalogue, not this one's — the msgid for
+  # "Projects dashboard" lives in phoenix_kit_projects.
+  defp place_label(%{slot: %PhoenixKitDashboards.Slot{} = slot}),
+    do: PhoenixKitDashboards.Slot.localized_name(slot)
+
   defp place_label(%{slot_key: key}), do: key
 
   defp place_title(%{audience: "personal"} = place),

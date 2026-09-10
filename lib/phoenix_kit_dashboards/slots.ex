@@ -166,6 +166,11 @@ defmodule PhoenixKitDashboards.Slots do
     %PhoenixKit.Dashboard.Tab{
       id: tab_id(slot),
       label: slot.name,
+      # The label is the DECLARING module's string, so it must translate
+      # through that module's catalogue — a tab with no backend renders its
+      # authored English in every locale.
+      gettext_backend: slot.gettext_backend,
+      gettext_domain: slot.gettext_domain,
       icon: slot.icon,
       # Always under THIS package's own prefix, never inside the declaring
       # module's namespace — see `PhoenixKitDashboards.Slot`. A two-segment

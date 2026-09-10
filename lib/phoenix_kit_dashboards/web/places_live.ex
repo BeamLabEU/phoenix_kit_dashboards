@@ -136,7 +136,9 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   defp matches?(_slot, _label, ""), do: true
 
   defp matches?(%Slot{} = slot, label, query) do
-    String.contains?(String.downcase(slot.name), query) or
+    # Match the TRANSLATED name: searching for what is on screen has to work.
+    String.contains?(String.downcase(Slot.localized_name(slot)), query) or
+      String.contains?(String.downcase(slot.name), query) or
       String.contains?(String.downcase(label), query)
   end
 
@@ -234,8 +236,10 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         <div class="flex flex-wrap items-center gap-2">
           <.icon name={@slot.icon} class="h-5 w-5 opacity-70" />
           <div class="min-w-0">
-            <p class="truncate font-medium">{@slot.name}</p>
-            <p :if={@slot.description} class="truncate text-xs opacity-60">{@slot.description}</p>
+            <p class="truncate font-medium">{Slot.localized_name(@slot)}</p>
+            <p :if={@slot.description} class="truncate text-xs opacity-60">
+              {Slot.localized_description(@slot)}
+            </p>
           </div>
           <div class="grow"></div>
           <span :if={@slot.provides != []} class="badge badge-ghost badge-sm">
@@ -361,11 +365,10 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
 
   defp audience_label(_placement), do: gettext("Everyone")
 
-  defp subject_badge(%Slot{provides: provides}) do
-    provides
-    |> Enum.map_join(", ", &(&1 |> String.split(".") |> List.last()))
-    |> then(&gettext("about a %{subject}", subject: &1))
-  end
+  # Deliberately says nothing about WHICH subject. Interpolating the context
+  # key's last segment put a raw English word ("project") inside an otherwise
+  # translated sentence, which reads worse in et/ru than a generic phrase.
+  defp subject_badge(%Slot{}), do: gettext("about one record")
 
   defp problem_text(%{slot_key: slot_key, problem: :dashboard_gone}),
     do: gettext("%{place}: the dashboard it showed was deleted.", place: slot_key)

@@ -49,6 +49,7 @@ defmodule PhoenixKitDashboards.Slot do
   | `allow_blank` | no | Whether "everyone builds their own" is offered. Default `false`. |
   | `chrome` | no | `:view` (default) or `:builder` — how much editing chrome the embedded render shows. |
   | `icon`, `description`, `priority` | no | Presentation in the control screen and the generated tab. |
+  | `gettext_backend` / `gettext_domain` | no | Translate `name` (and the generated tab's label) through the DECLARING module's own catalogue. Without a backend the name renders in whatever language it was authored in, for every locale. |
 
   `provides` names **context kinds**, not field names. A kind is a namespaced
   string owned by the module that defines the record (`"projects.project"`),
@@ -69,6 +70,8 @@ defmodule PhoenixKitDashboards.Slot do
           parent_tab: atom() | nil,
           slug: String.t(),
           module_key: String.t() | nil,
+          gettext_backend: module() | nil,
+          gettext_domain: String.t(),
           provides: [String.t()],
           cardinality: :one | :many,
           allow_personal: boolean(),
@@ -87,6 +90,8 @@ defmodule PhoenixKitDashboards.Slot do
             parent_tab: nil,
             slug: nil,
             module_key: nil,
+            gettext_backend: nil,
+            gettext_domain: "default",
             provides: [],
             cardinality: :one,
             allow_personal: true,
@@ -126,6 +131,12 @@ defmodule PhoenixKitDashboards.Slot do
          parent_tab: normalize_parent(map[:parent_tab]),
          slug: slug(map[:slug] || key),
          module_key: map[:module_key] && to_string(map[:module_key]),
+         # The name belongs to the DECLARING module, so it translates through
+         # that module's catalogue — the same way a tab or a permission label
+         # does. This package cannot hold msgids for strings other packages
+         # author.
+         gettext_backend: backend(map[:gettext_backend]),
+         gettext_domain: map[:gettext_domain] || "default",
          provides: normalize_provides(map[:provides]),
          cardinality: one_of(map[:cardinality], @cardinalities, :one),
          allow_personal: bool(map[:allow_personal], true),
@@ -154,6 +165,33 @@ defmodule PhoenixKitDashboards.Slot do
     do: kind in provides
 
   def provides?(%__MODULE__{}, _kind), do: false
+
+  @doc """
+  The slot's name in the viewer's language.
+
+  Translated through the DECLARING module's backend, since that is where the
+  msgid lives. Falls back to the authored string when a provider declares no
+  backend.
+  """
+  @spec localized_name(t()) :: String.t()
+  def localized_name(%__MODULE__{gettext_backend: nil, name: name}), do: name
+
+  def localized_name(%__MODULE__{gettext_backend: backend} = slot) do
+    Gettext.dgettext(backend, slot.gettext_domain, slot.name)
+  rescue
+    _ -> slot.name
+  end
+
+  @doc "The slot's description in the viewer's language, or `nil`."
+  @spec localized_description(t()) :: String.t() | nil
+  def localized_description(%__MODULE__{description: nil}), do: nil
+  def localized_description(%__MODULE__{gettext_backend: nil, description: d}), do: d
+
+  def localized_description(%__MODULE__{gettext_backend: backend} = slot) do
+    Gettext.dgettext(backend, slot.gettext_domain, slot.description)
+  rescue
+    _ -> slot.description
+  end
 
   @doc "Whether more than one dashboard may be bound to this slot."
   @spec many?(t()) :: boolean()
@@ -194,6 +232,9 @@ defmodule PhoenixKitDashboards.Slot do
     |> String.trim("-")
     |> String.downcase()
   end
+
+  defp backend(module) when is_atom(module) and not is_nil(module), do: module
+  defp backend(_other), do: nil
 
   defp normalize_parent(nil), do: nil
   defp normalize_parent(atom) when is_atom(atom), do: atom

@@ -773,7 +773,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       <div class="card-body p-4 items-center justify-center text-center text-sm text-base-content/50 gap-1">
         <.icon name="hero-link-slash" class="w-5 h-5" />
         <span class="font-medium">{@widget.name}</span>
-        <span>{missing_context_hint(@unresolved)}</span>
+        <span>{missing_context_hint(@widget, @unresolved)}</span>
       </div>
     </div>
     <.live_component
@@ -789,13 +789,34 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
     """
   end
 
-  # Names the missing subject in the viewer's language rather than printing a
-  # context key at them ("projects.project" means nothing to anyone).
-  defp missing_context_hint(kinds) do
-    kinds
-    |> Enum.map_join(", ", &(&1 |> String.split(".") |> List.last()))
-    |> then(&gettext("Shown when this dashboard is on a page with a %{subject}.", subject: &1))
+  # Names the missing subject in the viewer's language. The widget's own
+  # settings-field LABEL is already translated catalog data supplied by the
+  # provider ("Project" -> "Projekt"), so it is the one translated noun
+  # available here — far better than the context key's last segment, which
+  # would drop a raw English word into an otherwise translated sentence.
+  defp missing_context_hint(widget, kinds) do
+    case subject_labels(widget, kinds) do
+      "" ->
+        gettext("Shown when this dashboard is on a page that provides what it needs.")
+
+      subject ->
+        gettext("Shown when this dashboard is on a page with a %{subject}.", subject: subject)
+    end
   end
+
+  defp subject_labels(%Widget{settings_schema: schema}, kinds) when is_list(schema) do
+    kinds
+    |> Enum.map(fn kind ->
+      case Enum.find(schema, &(&1[:context] == kind)) do
+        %{label: label} when is_binary(label) -> translate_catalog(label)
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map_join(", ", &String.downcase/1)
+  end
+
+  defp subject_labels(_widget, _kinds), do: ""
 
   attr(:kinds, :list, required: true)
   attr(:context, :map, required: true)

@@ -127,7 +127,7 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
       dashboards: dashboards,
       tier: tier,
       active_index: min(socket.assigns.active_index, max(length(dashboards) - 1, 0)),
-      page_title: (slot && slot.name) || "Dashboard"
+      page_title: (slot && Slot.localized_name(slot)) || gettext("Dashboard")
     )
     |> assign_active()
     |> Refresh.reschedule()
