@@ -51,6 +51,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     only: [
       viewable_by?: 2,
       actor_opts: 1,
+      actor_uuid: 1,
       scope_label: 1
     ]
 
@@ -62,8 +63,10 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   alias PhoenixKitDashboards.Lattice
   alias PhoenixKitDashboards.Layout
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Registry
   alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Slot
   alias PhoenixKitDashboards.Widget
 
   # How often the host checks whether any live widget is due for a refresh.
@@ -75,6 +78,9 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     # (e.g. a wall TV) re-renders the instant anyone edits it from elsewhere.
     if connected?(socket) and is_binary(params["uuid"]) do
       Dashboards.subscribe(params["uuid"])
+      # Placements live elsewhere, so the header's "Shown in" needs its own
+      # subscription to stay true while someone rebinds from the Places screen.
+      Placements.subscribe()
     end
 
     {:ok,
@@ -98,7 +104,8 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
      |> assign(:preview_context, %{})
      # Live bind-source choices while the settings modal is open. Cleared with
      # the modal, because they describe an unsaved form, not the dashboard.
-     |> assign(:bind_sources, %{})}
+     |> assign(:bind_sources, %{})
+     |> assign(:places, [])}
   end
 
   @impl true
@@ -116,6 +123,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
            socket
            |> assign(:dashboard, dashboard)
            |> assign(:page_title, dashboard.title)
+           |> assign_places()
            |> resolve_active_layout(params["layout"])
            |> maybe_schedule_refresh()}
         else
@@ -581,6 +589,24 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
 
   defp maybe_put_binds(attrs, _binds), do: attrs
 
+  defp assign_places(socket) do
+    case socket.assigns[:dashboard] do
+      %Dashboard{uuid: uuid} ->
+        assign(socket, :places, Placements.places_for(uuid, actor_uuid(socket)))
+
+      _ ->
+        assign(socket, :places, [])
+    end
+  rescue
+    _ -> assign(socket, :places, [])
+  end
+
+  # Through the slot's own backend: the msgid for "Projects dashboard" lives in
+  # the module that declared the slot, not here.
+  defp place_label(%{label: label}) when is_binary(label) and label != "", do: label
+  defp place_label(%{slot: %Slot{} = slot}), do: Slot.localized_name(slot)
+  defp place_label(%{slot_key: key}), do: key
+
   defp save_settings(socket, instance_id, params) do
     grid? = Dashboard.layout_mode(socket.assigns.dashboard) == "grid"
 
@@ -735,6 +761,10 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   end
 
   @impl true
+  def handle_info({:placements_changed, _slot_key}, socket) do
+    {:noreply, assign_places(socket)}
+  end
+
   def handle_info(msg, socket) do
     Logger.debug("[Dashboards] Unhandled info: #{inspect(msg)}")
     {:noreply, socket}
@@ -965,6 +995,20 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
             title={gettext("Dashboard settings")}
           >
             <.icon name="hero-pencil" class="w-3.5 h-3.5" />
+          </.link>
+          <%!-- WHERE this board is shown. Editing a dashboard that happens to
+          be the company's admin home should never be a surprise, and the
+          builder was the one place that said nothing about it. --%>
+          <.link
+            navigate={Paths.places()}
+            class="flex flex-wrap items-center gap-1 text-xs hover:opacity-80"
+            title={gettext("Choose where this dashboard is shown")}
+          >
+            <span class="opacity-50">{gettext("Shown in")}:</span>
+            <span :if={@places == []} class="opacity-40">{gettext("nowhere yet")}</span>
+            <span :for={place <- @places} class="badge badge-ghost badge-sm">
+              {place_label(place)}
+            </span>
           </.link>
         </div>
         <div class="flex items-center gap-2">

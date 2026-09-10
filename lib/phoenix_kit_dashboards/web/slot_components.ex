@@ -71,6 +71,20 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         {tier_label(@tier)}
       </span>
 
+      <%!-- TWO different jobs, and conflating them is why this page felt like
+      a dead end: "Edit layout" changes what is ON this dashboard, "Change"
+      changes WHICH dashboard is shown here. Without the second, a place could
+      only ever be filled once — the picker lived in the empty state and
+      vanished the moment it was used. --%>
+      <.link
+        :if={Helpers.can_manage_places?(@scope)}
+        navigate={Paths.places()}
+        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        title={gettext("Choose which dashboard is shown here")}
+      >
+        <.icon name="hero-arrows-right-left" class="h-4 w-4" />
+        {gettext("Change")}
+      </.link>
       <.link
         :if={Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
         navigate={Paths.builder(@active.uuid)}

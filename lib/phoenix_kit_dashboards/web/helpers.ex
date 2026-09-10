@@ -172,6 +172,22 @@ defmodule PhoenixKitDashboards.Web.Helpers do
 
   defp resolve_embed_identity(_uuid), do: {nil, Scope.for_user(nil)}
 
+  @doc """
+  Whether this viewer may change what is shown in a place.
+
+  Placing a dashboard is an administrative act separate from editing one: a
+  person may own a dashboard they are not allowed to publish onto the admin
+  home.
+  """
+  @spec can_manage_places?(map() | nil) :: boolean()
+  def can_manage_places?(nil), do: false
+
+  def can_manage_places?(scope) do
+    Code.ensure_loaded?(Scope) and Scope.has_module_access?(scope, "dashboards")
+  rescue
+    _ -> false
+  end
+
   @doc "All roles (for pickers); `[]` when the roles API is unavailable."
   @spec list_roles() :: [struct()]
   def list_roles do

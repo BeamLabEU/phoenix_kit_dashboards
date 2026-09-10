@@ -149,7 +149,14 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
     <div class="flex flex-col mx-auto max-w-5xl px-4 py-6 gap-6">
       <%!-- No in-page <h1>: the admin header breadcrumb already shows the page
       title (@page_title), so the page reclaims the space (workspace canon). --%>
-      <div class="flex items-center justify-end">
+      <div class="flex items-center justify-end gap-2">
+        <%!-- Places was reachable only from a "Shown in" chip or a slot's
+        empty state, so an admin with nothing placed yet had no way to find
+        it at all. --%>
+        <.link navigate={Paths.places()} class="btn btn-ghost btn-sm">
+          <.icon name="hero-rectangle-group" class="w-4 h-4" />
+          {gettext("Places")}
+        </.link>
         <.link navigate={Paths.new()} class="btn btn-primary btn-sm">
           <.icon name="hero-plus" class="w-4 h-4" />
           {gettext("Create dashboard")}
