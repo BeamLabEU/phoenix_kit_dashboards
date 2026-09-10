@@ -32,6 +32,7 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
   alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Slot
   alias PhoenixKitDashboards.Slots
+  alias PhoenixKitDashboards.Web.Personal
 
   @impl true
   def mount(_params, _session, socket) do
@@ -86,6 +87,14 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
      |> Refresh.reschedule()}
   end
 
+  def handle_event("fork_personal", _params, socket) do
+    {:noreply, Personal.fork(socket, &load_slot/1)}
+  end
+
+  def handle_event("reset_personal", _params, socket) do
+    {:noreply, Personal.reset(socket, &load_slot/1)}
+  end
+
   def handle_event("refresh_pause", _params, socket), do: {:noreply, Refresh.pause(socket)}
   def handle_event("refresh_resume", _params, socket), do: {:noreply, Refresh.resume(socket)}
   def handle_event(_event, _params, socket), do: {:noreply, socket}
@@ -93,7 +102,15 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
   # ── Loading ────────────────────────────────────────────────────────
 
   defp load_slot(%{assigns: %{slot_key: nil}} = socket) do
-    assign(socket, slot: nil, dashboards: [], tier: :none, active: nil, page_title: "Dashboard")
+    socket
+    |> assign(
+      slot: nil,
+      dashboards: [],
+      tier: :none,
+      active: nil,
+      page_title: gettext("Dashboard")
+    )
+    |> Personal.assign_flags()
   end
 
   defp load_slot(%{assigns: %{slot_key: slot_key}} = socket) do
@@ -130,6 +147,7 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
       page_title: (slot && Slot.localized_name(slot)) || gettext("Dashboard")
     )
     |> assign_active()
+    |> Personal.assign_flags()
     |> Refresh.reschedule()
   end
 
@@ -198,7 +216,11 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={"#{@id_prefix}root"} phx-hook="DashboardVisibility" class="flex flex-col gap-3">
+    <div
+      id={"#{@id_prefix}root"}
+      phx-hook="DashboardVisibility"
+      class="flex flex-col px-4 py-6 gap-4"
+    >
       <.slot_header
         :if={@active}
         slot={@slot}
@@ -207,6 +229,8 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
         tier={@tier}
         active={@active}
         scope={@phoenix_kit_current_scope}
+        can_fork?={@can_fork?}
+        mine?={@mine?}
       />
 
       <.slot_empty :if={is_nil(@active)} slot={@slot} scope={@phoenix_kit_current_scope} />

@@ -32,6 +32,8 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
   attr(:tier, :atom, required: true)
   attr(:active, :map, required: true)
   attr(:scope, :any, default: nil)
+  attr(:can_fork?, :boolean, default: false)
+  attr(:mine?, :boolean, default: false)
 
   def slot_header(assigns) do
     ~H"""
@@ -59,9 +61,13 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         </button>
       </div>
 
-      <h3 :if={length(@dashboards) <= 1} class="min-w-0 grow truncate font-semibold">
+      <.link
+        :if={length(@dashboards) <= 1}
+        navigate={Paths.builder(@active.uuid)}
+        class="min-w-0 grow truncate font-semibold hover:text-primary"
+      >
         {@active.title}
-      </h3>
+      </.link>
       <div :if={length(@dashboards) > 1} class="grow"></div>
 
       <%!-- Which rule won. Only shown when it is not the plain company-wide
@@ -70,6 +76,30 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
       <span :if={tier_label(@tier)} class="badge badge-ghost badge-sm shrink-0">
         {tier_label(@tier)}
       </span>
+
+      <%!-- The per-person tier. Copying leaves the shared board untouched and
+      still visible to everyone else; resetting UNPLACES the copy rather than
+      deleting it, so an afternoon of arranging widgets survives the click. --%>
+      <button
+        :if={@can_fork?}
+        type="button"
+        phx-click="fork_personal"
+        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        title={gettext("Copy this and make the copy your own version")}
+      >
+        <.icon name="hero-user" class="h-4 w-4" />
+        {gettext("Make it mine")}
+      </button>
+      <button
+        :if={@mine?}
+        type="button"
+        phx-click="reset_personal"
+        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        title={gettext("Stop using your own version here")}
+      >
+        <.icon name="hero-arrow-uturn-left" class="h-4 w-4" />
+        {gettext("Use the shared one")}
+      </button>
 
       <%!-- TWO different jobs, and conflating them is why this page felt like
       a dead end: "Edit layout" changes what is ON this dashboard, "Change"

@@ -164,14 +164,14 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col gap-4">
+    <%!-- Same page container as every other admin page here, and no in-page
+    <h1>: the admin header breadcrumb already shows @page_title, so the page
+    reclaims the space (workspace canon — see DashboardsLive). --%>
+    <div class="flex flex-col mx-auto max-w-5xl px-4 py-6 gap-6">
       <div class="flex flex-wrap items-center gap-3">
-        <div>
-          <h1 class="text-xl font-semibold">{gettext("Places")}</h1>
-          <p class="text-sm opacity-70">
-            {gettext("Choose which dashboard appears where, and who sees it.")}
-          </p>
-        </div>
+        <p class="text-sm opacity-70">
+          {gettext("Choose which dashboard appears where, and who sees it.")}
+        </p>
         <div class="grow"></div>
         <form phx-change="search" phx-submit="search">
           <input
@@ -236,7 +236,16 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         <div class="flex flex-wrap items-center gap-2">
           <.icon name={@slot.icon} class="h-5 w-5 opacity-70" />
           <div class="min-w-0">
-            <p class="truncate font-medium">{Slot.localized_name(@slot)}</p>
+            <.link
+              :if={@slot.surface == :module_tab}
+              navigate={Paths.slot(@slot.slug)}
+              class="block truncate font-medium hover:text-primary"
+            >
+              {Slot.localized_name(@slot)}
+            </.link>
+            <p :if={@slot.surface != :module_tab} class="truncate font-medium">
+              {Slot.localized_name(@slot)}
+            </p>
             <p :if={@slot.description} class="truncate text-xs opacity-60">
               {Slot.localized_description(@slot)}
             </p>
@@ -259,7 +268,14 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         <ul :if={@rows != []} class="flex flex-col gap-1">
           <li :for={row <- @rows} class="flex flex-wrap items-center gap-2 text-sm">
             <span class="badge badge-sm">{row.audience_label}</span>
-            <span class="min-w-0 truncate">{row.title}</span>
+            <.link
+              :if={row.dashboard_uuid}
+              navigate={Paths.builder(row.dashboard_uuid)}
+              class="min-w-0 truncate hover:text-primary"
+            >
+              {row.title}
+            </.link>
+            <span :if={is_nil(row.dashboard_uuid)} class="min-w-0 truncate">{row.title}</span>
             <span :if={row.audience == "role"} class="text-xs opacity-60">
               {gettext("priority")} {row.priority}
             </span>

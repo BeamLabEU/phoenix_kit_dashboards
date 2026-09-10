@@ -36,6 +36,7 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
   alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Slots
   alias PhoenixKitDashboards.Web.Helpers
+  alias PhoenixKitDashboards.Web.Personal
 
   @slot_key "core.admin_home"
   @id_prefix "pk-adminhome-"
@@ -93,6 +94,14 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
      |> Refresh.reschedule()}
   end
 
+  def handle_event("fork_personal", _params, socket) do
+    {:noreply, Personal.fork(socket, &load/1)}
+  end
+
+  def handle_event("reset_personal", _params, socket) do
+    {:noreply, Personal.reset(socket, &load/1)}
+  end
+
   def handle_event("refresh_pause", _params, socket), do: {:noreply, Refresh.pause(socket)}
   def handle_event("refresh_resume", _params, socket), do: {:noreply, Refresh.resume(socket)}
   def handle_event(_event, _params, socket), do: {:noreply, socket}
@@ -113,6 +122,7 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
       active_index: min(socket.assigns.active_index, max(length(dashboards) - 1, 0))
     )
     |> assign_active()
+    |> Personal.assign_flags()
     |> notify_parent(dashboards)
     |> Refresh.reschedule()
   end
@@ -177,6 +187,8 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
         tier={@tier}
         active={@active}
         scope={@phoenix_kit_current_scope}
+        can_fork?={@can_fork?}
+        mine?={@mine?}
       />
       <.slot_board
         :if={@active}

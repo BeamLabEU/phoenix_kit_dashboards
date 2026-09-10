@@ -227,7 +227,11 @@ defmodule PhoenixKitDashboards.Dashboards do
         scope: "personal",
         owner_user_uuid: user_uuid,
         layout: layout,
-        config: source.config
+        # A copy is not placed anywhere until someone says so. `config` now
+        # carries the personal placement (`"slot"`), and carrying it into the
+        # clone would give one person two dashboards claiming the same place,
+        # with the winner decided by row order.
+        config: Map.delete(source.config || %{}, "slot")
       },
       # A clone logs as dashboard.created like any create, but stays
       # distinguishable in the audit trail via the source pointer.

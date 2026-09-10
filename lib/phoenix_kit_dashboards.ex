@@ -176,7 +176,10 @@ defmodule PhoenixKitDashboards do
         permission: @module_key,
         parent: :admin_dashboards,
         match: :exact,
-        visible: false,
+        # VISIBLE, unlike this module's other hidden pages: it is a place an
+        # administrator navigates to, not a step inside another flow, and the
+        # Dashboards section otherwise offered no subtabs at all.
+        visible: true,
         live_view: {PhoenixKitDashboards.Web.PlacesLive, :index}
       },
       # The per-dashboard builder. Dynamic :uuid segment is spliced verbatim

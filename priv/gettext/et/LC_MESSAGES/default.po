@@ -170,12 +170,12 @@ msgstr "Loo oma esimene töölaud"
 msgid "Current time — normal, digital or analog, with a per-clock timezone."
 msgstr "Kellaaeg — tavaline, digitaalne või analoog, iga kella jaoks oma ajavöönd."
 
-#: lib/phoenix_kit_dashboards.ex:234
+#: lib/phoenix_kit_dashboards.ex:237
 #, elixir-autogen, elixir-format
 msgid "Dashboard Builder"
 msgstr "Töölaua koostaja"
 
-#: lib/phoenix_kit_dashboards.ex:233
+#: lib/phoenix_kit_dashboards.ex:236
 #, elixir-autogen, elixir-format
 msgid "Dashboard Settings"
 msgstr "Töölaua seaded"
@@ -211,9 +211,9 @@ msgstr "Töölaua seaded"
 msgid "Dashboard updated."
 msgstr "Töölaud uuendatud."
 
-#: lib/phoenix_kit_dashboards.ex:231
+#: lib/phoenix_kit_dashboards.ex:234
 #: lib/phoenix_kit_dashboards/web/dashboards_live.ex:37
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:43
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:45
 #, elixir-autogen, elixir-format
 msgid "Dashboards"
 msgstr "Töölauad"
@@ -343,7 +343,7 @@ msgstr "Moodul"
 msgid "Module stats"
 msgstr "Mooduli statistika"
 
-#: lib/phoenix_kit_dashboards.ex:232
+#: lib/phoenix_kit_dashboards.ex:235
 #, elixir-autogen, elixir-format
 msgid "New Dashboard"
 msgstr "Uus töölaud"
@@ -415,7 +415,7 @@ msgid "Reloaded — this dashboard was just edited elsewhere."
 msgstr "Laaditi uuesti — seda töölauda muudeti just mujal."
 
 #: lib/phoenix_kit_dashboards/web/builder_components.ex:576
-#: lib/phoenix_kit_dashboards/web/places_live.ex:277
+#: lib/phoenix_kit_dashboards/web/places_live.ex:293
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Eemalda"
@@ -436,7 +436,7 @@ msgid "Resize this layout's grid to match the screen you're viewing on"
 msgstr "Muuda selle paigutuse ruudustiku suurus vastavaks su ekraanile"
 
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:252
-#: lib/phoenix_kit_dashboards/web/places_live.ex:298
+#: lib/phoenix_kit_dashboards/web/places_live.ex:314
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "Roll"
@@ -663,22 +663,22 @@ msgstr "näitajat"
 msgid "unavailable (module disabled or access restricted)."
 msgstr "pole saadaval (moodul on välja lülitatud või ligipääs piiratud)."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:380
+#: lib/phoenix_kit_dashboards/web/places_live.ex:396
 #, elixir-autogen, elixir-format
 msgid "%{place}: its module is turned off."
 msgstr "%{place}: selle moodul on välja lülitatud."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:374
+#: lib/phoenix_kit_dashboards/web/places_live.ex:390
 #, elixir-autogen, elixir-format
 msgid "%{place}: the dashboard it showed was deleted."
 msgstr "%{place}: seal kuvatud töölaud on kustutatud."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:377
+#: lib/phoenix_kit_dashboards/web/places_live.ex:393
 #, elixir-autogen, elixir-format
 msgid "%{place}: this place no longer exists."
 msgstr "%{place}: seda kohta enam ei ole."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:349
+#: lib/phoenix_kit_dashboards/web/places_live.ex:365
 #, elixir-autogen, elixir-format
 msgid "(deleted dashboard)"
 msgstr "(kustutatud töölaud)"
@@ -688,8 +688,8 @@ msgstr "(kustutatud töölaud)"
 msgid "A personal dashboard can't be shown to other people. Pick a shared one."
 msgstr "Isiklikku töölauda ei saa teistele näidata. Vali jagatud töölaud."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:292
-#: lib/phoenix_kit_dashboards/web/places_live.ex:361
+#: lib/phoenix_kit_dashboards/web/places_live.ex:308
+#: lib/phoenix_kit_dashboards/web/places_live.ex:377
 #, elixir-autogen, elixir-format
 msgid "A role"
 msgstr "Roll"
@@ -704,7 +704,7 @@ msgstr "Kindel valik"
 msgid "A wall-screen dashboard can't be used as an admin page."
 msgstr "Seinaekraani töölauda ei saa kasutada admin-lehena."
 
-#: lib/phoenix_kit_dashboards.ex:304
+#: lib/phoenix_kit_dashboards.ex:307
 #, elixir-autogen, elixir-format
 msgid "Admin home"
 msgstr "Admini avaleht"
@@ -714,29 +714,30 @@ msgstr "Admini avaleht"
 msgid "All dashboards"
 msgstr "Kõik töölauad"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:249
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:86
+#: lib/phoenix_kit_dashboards/web/places_live.ex:258
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:116
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "Muuda"
 
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:112
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:142
 #, elixir-autogen, elixir-format
 msgid "Choose a dashboard"
 msgstr "Vali töölaud"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:172
+#: lib/phoenix_kit_dashboards/web/places_live.ex:173
 #, elixir-autogen, elixir-format
 msgid "Choose which dashboard appears where, and who sees it."
 msgstr "Vali, milline töölaud kus kuvatakse ja kes seda näeb."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:311
-#: lib/phoenix_kit_dashboards/web/slot_live.ex:130
+#: lib/phoenix_kit_dashboards/web/places_live.ex:327
+#: lib/phoenix_kit_dashboards/web/slot_live.ex:111
+#: lib/phoenix_kit_dashboards/web/slot_live.ex:147
 #, elixir-autogen, elixir-format
 msgid "Dashboard"
 msgstr "Töölaud"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:249
+#: lib/phoenix_kit_dashboards/web/places_live.ex:258
 #, elixir-autogen, elixir-format
 msgid "Done"
 msgstr "Valmis"
@@ -746,14 +747,14 @@ msgstr "Valmis"
 msgid "Each person sees their own."
 msgstr "Igaüks näeb enda oma."
 
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:94
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:124
 #, elixir-autogen, elixir-format
 msgid "Edit layout"
 msgstr "Muuda paigutust"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:289
-#: lib/phoenix_kit_dashboards/web/places_live.ex:357
-#: lib/phoenix_kit_dashboards/web/places_live.ex:366
+#: lib/phoenix_kit_dashboards/web/places_live.ex:305
+#: lib/phoenix_kit_dashboards/web/places_live.ex:373
+#: lib/phoenix_kit_dashboards/web/places_live.ex:382
 #, elixir-autogen, elixir-format
 msgid "Everyone"
 msgstr "Kõik"
@@ -763,7 +764,7 @@ msgstr "Kõik"
 msgid "Follows whichever page this dashboard is shown on."
 msgstr "Järgib lehte, millel seda töölauda kuvatakse."
 
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:167
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:197
 #, elixir-autogen, elixir-format
 msgid "For your role"
 msgstr "Sinu rolli jaoks"
@@ -773,7 +774,7 @@ msgstr "Sinu rolli jaoks"
 msgid "Mine"
 msgstr "Minu oma"
 
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:109
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:139
 #, elixir-autogen, elixir-format
 msgid "No dashboard is shown here yet."
 msgstr "Siin ei kuvata veel ühtegi töölauda."
@@ -783,7 +784,7 @@ msgstr "Siin ei kuvata veel ühtegi töölauda."
 msgid "No module offers a place for a dashboard yet."
 msgstr "Ükski moodul ei paku veel töölauale kohta."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:256
+#: lib/phoenix_kit_dashboards/web/places_live.ex:265
 #, elixir-autogen, elixir-format
 msgid "Nothing shown here — people see this module's normal page."
 msgstr "Siin ei kuvata midagi — kasutajad näevad selle mooduli tavalist lehte."
@@ -798,7 +799,7 @@ msgstr "Muudab ainult seda, mida sina siin näed."
 msgid "Pick a %{subject}"
 msgstr "Vali %{subject}"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:313
+#: lib/phoenix_kit_dashboards/web/places_live.ex:329
 #, elixir-autogen, elixir-format
 msgid "Pick a dashboard"
 msgstr "Vali töölaud"
@@ -808,7 +809,7 @@ msgstr "Vali töölaud"
 msgid "Pick a dashboard."
 msgstr "Vali töölaud."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:300
+#: lib/phoenix_kit_dashboards/web/places_live.ex:316
 #, elixir-autogen, elixir-format
 msgid "Pick a role"
 msgstr "Vali roll"
@@ -818,10 +819,9 @@ msgstr "Vali roll"
 msgid "Pick a role."
 msgstr "Vali roll."
 
-#: lib/phoenix_kit_dashboards.ex:235
+#: lib/phoenix_kit_dashboards.ex:238
 #: lib/phoenix_kit_dashboards/web/dashboards_live.ex:158
 #: lib/phoenix_kit_dashboards/web/places_live.ex:50
-#: lib/phoenix_kit_dashboards/web/places_live.ex:170
 #, elixir-autogen, elixir-format
 msgid "Places"
 msgstr "Kohad"
@@ -831,7 +831,7 @@ msgstr "Kohad"
 msgid "Preview as"
 msgstr "Eelvaade kui"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:306
+#: lib/phoenix_kit_dashboards/web/places_live.ex:322
 #, elixir-autogen, elixir-format
 msgid "Priority"
 msgstr "Prioriteet"
@@ -841,7 +841,7 @@ msgstr "Prioriteet"
 msgid "Search places"
 msgstr "Otsi kohti"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:320
+#: lib/phoenix_kit_dashboards/web/places_live.ex:336
 #, elixir-autogen, elixir-format
 msgid "Show it here"
 msgstr "Kuva see siin"
@@ -881,22 +881,22 @@ msgstr "Selles kohas on sellele sihtrühmale juba töölaud määratud."
 msgid "Which one"
 msgstr "Milline"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:286
+#: lib/phoenix_kit_dashboards/web/places_live.ex:302
 #, elixir-autogen, elixir-format
 msgid "Who sees it"
 msgstr "Kes seda näeb"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:324
+#: lib/phoenix_kit_dashboards/web/places_live.ex:340
 #, elixir-autogen, elixir-format
 msgid "Widgets on this page can follow whatever this page is about."
 msgstr "Selle lehe vidinad saavad järgida seda, millest leht räägib."
 
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:166
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:196
 #, elixir-autogen, elixir-format
 msgid "Yours"
 msgstr "Sinu oma"
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:264
+#: lib/phoenix_kit_dashboards/web/places_live.ex:280
 #, elixir-autogen, elixir-format
 msgid "priority"
 msgstr "prioriteet"
@@ -938,12 +938,12 @@ msgstr "veel mitte kusagil"
 msgid "Shown when this dashboard is on a page that provides what it needs."
 msgstr "Kuvatakse siis, kui see töölaud on lehel, mis annab talle vajaliku."
 
-#: lib/phoenix_kit_dashboards/web/places_live.ex:371
+#: lib/phoenix_kit_dashboards/web/places_live.ex:387
 #, elixir-autogen, elixir-format
 msgid "about one record"
 msgstr "käib ühe kirje kohta"
 
-#: lib/phoenix_kit_dashboards.ex:305
+#: lib/phoenix_kit_dashboards.ex:308
 #, elixir-autogen, elixir-format
 msgid "The first page you see after signing in"
 msgstr "Esimene leht, mida pärast sisselogimist näed"
@@ -953,7 +953,27 @@ msgstr "Esimene leht, mida pärast sisselogimist näed"
 msgid "Choose where this dashboard is shown"
 msgstr "Vali, kus seda töölauda kuvatakse"
 
-#: lib/phoenix_kit_dashboards/web/slot_components.ex:83
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:113
 #, elixir-autogen, elixir-format
 msgid "Choose which dashboard is shown here"
 msgstr "Vali, milline töölaud siin kuvatakse"
+
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:88
+#, elixir-autogen, elixir-format
+msgid "Copy this and make the copy your own version"
+msgstr "Kopeeri see ja tee koopiast enda versioon"
+
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:91
+#, elixir-autogen, elixir-format
+msgid "Make it mine"
+msgstr "Tee enda omaks"
+
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:98
+#, elixir-autogen, elixir-format
+msgid "Stop using your own version here"
+msgstr "Lõpeta siin oma versiooni kasutamine"
+
+#: lib/phoenix_kit_dashboards/web/slot_components.ex:101
+#, elixir-autogen, elixir-format
+msgid "Use the shared one"
+msgstr "Kasuta jagatut"
