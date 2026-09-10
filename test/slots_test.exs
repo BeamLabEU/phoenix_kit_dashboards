@@ -156,7 +156,7 @@ defmodule PhoenixKitDashboards.SlotsTest do
       # `projects/dashboard` would be swallowed by the projects module's own
       # dynamic `projects/:id` route and render its show page against the
       # literal id "dashboard". Found on the box; this pins the fix.
-      assert tab.path == "dashboards/at/test-module"
+      assert tab.path == "dashboards/places/test-module"
       refute String.starts_with?(tab.path, "test/")
     end
 
@@ -168,6 +168,33 @@ defmodule PhoenixKitDashboards.SlotsTest do
 
       {:ok, other} = Slot.from_map(%{key: "test.other", name: "x", surface: :record_tab}, nil)
       refute Slots.tab_id(slot) == Slots.tab_id(other)
+    end
+  end
+
+  describe "sidebar highlighting" do
+    test "the top-level Dashboards tab does NOT claim a slot page" do
+      # A plain prefix match lit BOTH this tab and the slot's own tab under its
+      # module for one page. The parent still owns everything else beneath it.
+      tab = Enum.find(PhoenixKitDashboards.admin_tabs(), &(&1.id == :admin_dashboards))
+
+      assert {:regex, regex} = tab.match
+
+      refute Regex.match?(regex, "/admin/dashboards/places/projects-module")
+
+      for owned <- [
+            "/admin/dashboards",
+            "/admin/dashboards/new",
+            "/admin/dashboards/places",
+            "/admin/dashboards/01a06e3a-2b88-7a19-ac34-faeb681ec048"
+          ] do
+        assert Regex.match?(regex, owned), "expected #{owned} to belong to the Dashboards tab"
+      end
+    end
+
+    test "the Places screen matches exactly, not as a prefix over the slot pages" do
+      tab = Enum.find(PhoenixKitDashboards.admin_tabs(), &(&1.id == :admin_dashboards_places))
+
+      assert tab.match == :exact
     end
   end
 

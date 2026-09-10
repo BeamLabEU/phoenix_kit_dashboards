@@ -124,7 +124,12 @@ defmodule PhoenixKitDashboards do
         priority: 650,
         level: :admin,
         permission: @module_key,
-        match: :prefix,
+        # NOT a plain prefix match. A slot's page lives under this module's
+        # namespace, so a bare prefix highlighted BOTH this tab and the slot's
+        # own tab under its module at the same time — two sidebar entries lit
+        # for one page. Everything else under `dashboards/` still belongs to
+        # this tab.
+        match: slot_aware_match(),
         group: :admin_modules,
         live_view: {PhoenixKitDashboards.Web.DashboardsLive, :index}
       },
@@ -170,6 +175,7 @@ defmodule PhoenixKitDashboards do
         level: :admin,
         permission: @module_key,
         parent: :admin_dashboards,
+        match: :exact,
         visible: false,
         live_view: {PhoenixKitDashboards.Web.PlacesLive, :index}
       },
@@ -189,6 +195,15 @@ defmodule PhoenixKitDashboards do
         live_view: {PhoenixKitDashboards.Web.BuilderLive, :edit}
       }
     ]
+  end
+
+  # Paths reach the matcher normalised (URL prefix and locale stripped), so
+  # this sees `/admin/dashboards/...`. A function rather than a module
+  # attribute: a compiled Regex holds a reference and cannot be injected into
+  # a function body (the same reason `phoenix_kit_projects` builds its list
+  # matcher this way).
+  defp slot_aware_match do
+    {:regex, ~r{^/admin/dashboards(?!/places/)(/.*)?$}}
   end
 
   @doc """

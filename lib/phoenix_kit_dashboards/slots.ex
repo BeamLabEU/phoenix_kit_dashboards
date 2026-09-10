@@ -28,6 +28,7 @@ defmodule PhoenixKitDashboards.Slots do
   require Logger
 
   alias PhoenixKit.Users.Auth.Scope
+  alias PhoenixKitDashboards.Paths
   alias PhoenixKitDashboards.Slot
 
   @pt_key {__MODULE__, :catalog}
@@ -224,7 +225,7 @@ defmodule PhoenixKitDashboards.Slots do
 
   @doc "The generated route path for a `:module_tab` slot."
   @spec slot_path(Slot.t()) :: String.t()
-  def slot_path(%Slot{slug: slug}), do: "dashboards/at/" <> slug
+  def slot_path(%Slot{slug: slug}), do: Paths.slot_segment() <> "/" <> slug
 
   defp slug_taken?(acc, %Slot{} = slot) do
     Enum.any?(acc, fn {_key, existing} -> existing.slug == slot.slug end)

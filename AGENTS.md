@@ -21,7 +21,7 @@ personal / system / role.
   priority 650, group `:admin_modules`) plus four hidden tabs —
   `dashboards/new`, `dashboards/:uuid/edit` (form), `dashboards/places`
   (the placement control screen) and `dashboards/:uuid` (builder) — plus one
-  generated tab per declared `:module_tab` slot at `dashboards/at/<slug>`.
+  generated tab per declared `:module_tab` slot at `dashboards/places/<slug>`.
 - **Module key** `"dashboards"`; settings prefix `dashboards_` (only
   `dashboards_enabled` today).
 
@@ -189,11 +189,15 @@ Repo-local aliases:
   materialized copy and silently skips the write when the edit equals the packed
   values.
 - A `:module_tab` slot's URL is built by THIS package
-  (`dashboards/at/<slug>`), never inside the declaring module's namespace.
+  (`dashboards/places/<slug>`), never inside the declaring module's namespace.
   Routes are generated per module in declaration order, so a slot naming
   `projects/dashboard` is swallowed by that module's dynamic `projects/:id`
   and renders its show page against the literal id `"dashboard"`. The sidebar
-  position comes from `parent_tab`, which is independent of the URL.
+  position comes from `parent_tab`, which is independent of the URL. The
+  top-level Dashboards tab therefore cannot use a plain `:prefix` match — it
+  would light up alongside the slot's own tab for one page — so it carries a
+  regex excluding `dashboards/places/<slug>`, and the Places screen itself
+  matches `:exact`.
 - The slot catalog must be discovered through **`ModuleDiscovery`** (a beam
   scan) as well as `ModuleRegistry` (a runtime `:persistent_term`). Slot tabs
   feed `admin_tabs/0`, which core turns into ROUTES at **compile** time, when
@@ -294,7 +298,7 @@ widgets — a module defines a zero-arity function returning plain maps.
 | `name` | yes | Plain-language, shown on the Places screen. |
 | `surface` | no | `:module_tab` (a sidebar sub-tab), `:record_tab` (rendered by the owning module inside one record), `:admin_home`. Default `:module_tab`. |
 | `parent_tab` | for `:module_tab` | Sidebar tab id to hang under. The URL is this package's; a slot never names one. |
-| `slug` | no | Last URL segment (`dashboards/at/<slug>`). Defaults to the key. |
+| `slug` | no | Last URL segment (`dashboards/places/<slug>`). Defaults to the key. |
 | `module_key` | no | Gates the slot AND its generated tab on that module. |
 | `provides` | no | Context kinds supplied at render (`["projects.project"]`). |
 | `cardinality` | no | `:one` (default) or `:many` — several dashboards as tabs. |

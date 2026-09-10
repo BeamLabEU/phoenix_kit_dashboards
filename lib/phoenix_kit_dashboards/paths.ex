@@ -35,4 +35,22 @@ defmodule PhoenixKitDashboards.Paths do
   """
   @spec places() :: String.t()
   def places, do: Routes.path("#{@base}/places")
+
+  @doc """
+  The route prefix a `:module_tab` slot's page lives under, relative to
+  `/admin` — `"dashboards/places"`.
+
+  A slot's page belongs to THIS module's namespace, not the declaring
+  module's: routes are emitted per module in discovery order and Phoenix
+  matches in definition order, so `projects/dashboard` is swallowed by that
+  module's own dynamic `projects/:id` and renders its show page against the
+  literal id "dashboard". Two segments also keep it clear of our own
+  `dashboards/:uuid`.
+  """
+  @spec slot_segment() :: String.t()
+  def slot_segment, do: "dashboards/places"
+
+  @doc "The page showing whatever fills one place."
+  @spec slot(String.t()) :: String.t()
+  def slot(slug), do: Routes.path("#{@base}/places/#{slug}")
 end
