@@ -31,7 +31,6 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Layouts
-  alias PhoenixKitDashboards.Paths
   alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Refresh
   alias PhoenixKitDashboards.Schemas.Dashboard
@@ -95,21 +94,6 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
      |> Refresh.reschedule()}
   end
 
-  def handle_event("fork_and_edit", _params, socket) do
-    # Fork FIRST, then open the copy: on a template place the person is meant
-    # to edit their own board, never everyone's.
-    socket = Personal.fork(socket, &load/1)
-
-    case socket.assigns[:active] do
-      %Dashboard{uuid: uuid} -> {:noreply, push_navigate(socket, to: Paths.builder(uuid))}
-      _ -> {:noreply, socket}
-    end
-  end
-
-  def handle_event("create_own", _params, socket) do
-    {:noreply, Personal.create_own(socket, &load/1)}
-  end
-
   def handle_event("fork_personal", _params, socket) do
     {:noreply, Personal.fork(socket, &load/1)}
   end
@@ -135,7 +119,6 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
       slot: Slots.get(@slot_key),
       dashboards: dashboards,
       tier: tier,
-      policy: Placements.policy_for(@slot_key, scope),
       active_index: min(socket.assigns.active_index, max(length(dashboards) - 1, 0))
     )
     |> assign_active()
@@ -206,7 +189,6 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
         scope={@phoenix_kit_current_scope}
         can_fork?={@can_fork?}
         mine?={@mine?}
-        fork_on_edit?={@fork_on_edit?}
       />
       <.slot_board
         :if={@active}

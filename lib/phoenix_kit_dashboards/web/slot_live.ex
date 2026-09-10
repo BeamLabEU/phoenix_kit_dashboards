@@ -27,7 +27,6 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Layouts
-  alias PhoenixKitDashboards.Paths
   alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Refresh
   alias PhoenixKitDashboards.Schemas.Dashboard
@@ -88,21 +87,6 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
      |> Refresh.reschedule()}
   end
 
-  def handle_event("fork_and_edit", _params, socket) do
-    # Fork FIRST, then open the copy: on a template place the person is meant
-    # to edit their own board, never everyone's.
-    socket = Personal.fork(socket, &load_slot/1)
-
-    case socket.assigns[:active] do
-      %Dashboard{uuid: uuid} -> {:noreply, push_navigate(socket, to: Paths.builder(uuid))}
-      _ -> {:noreply, socket}
-    end
-  end
-
-  def handle_event("create_own", _params, socket) do
-    {:noreply, Personal.create_own(socket, &load_slot/1)}
-  end
-
   def handle_event("fork_personal", _params, socket) do
     {:noreply, Personal.fork(socket, &load_slot/1)}
   end
@@ -123,7 +107,6 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
       slot: nil,
       dashboards: [],
       tier: :none,
-      policy: "shared",
       active: nil,
       page_title: gettext("Dashboard")
     )
@@ -161,7 +144,6 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
       dashboards: dashboards,
       tier: tier,
       active_index: min(socket.assigns.active_index, max(length(dashboards) - 1, 0)),
-      policy: Placements.policy_for(slot_key, scope),
       page_title: (slot && Slot.localized_name(slot)) || gettext("Dashboard")
     )
     |> assign_active()
@@ -249,15 +231,9 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
         scope={@phoenix_kit_current_scope}
         can_fork?={@can_fork?}
         mine?={@mine?}
-        fork_on_edit?={@fork_on_edit?}
       />
 
-      <.slot_empty
-        :if={is_nil(@active)}
-        slot={@slot}
-        scope={@phoenix_kit_current_scope}
-        can_create_own?={@can_create_own?}
-      />
+      <.slot_empty :if={is_nil(@active)} slot={@slot} scope={@phoenix_kit_current_scope} />
 
       <.slot_board
         :if={@active}

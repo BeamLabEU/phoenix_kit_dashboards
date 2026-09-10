@@ -46,7 +46,6 @@ defmodule PhoenixKitDashboards.Slot do
   | `provides` | no | Context kinds this slot supplies at render, e.g. `["projects.project"]`. Empty = a context-free slot. |
   | `cardinality` | no | `:one` (default) or `:many` — whether several dashboards may be bound here and shown as tabs. |
   | `allow_personal` | no | Whether a person may fork their own copy here. Default `true`. |
-  | `allow_blank` | no | Whether "everyone builds their own" is offered. Default `false`. |
   | `chrome` | no | `:view` (default) or `:builder` — how much editing chrome the embedded render shows. |
   | `icon`, `description`, `priority` | no | Presentation in the control screen and the generated tab. |
   | `gettext_backend` / `gettext_domain` | no | Translate `name` (and the generated tab's label) through the DECLARING module's own catalogue. Without a backend the name renders in whatever language it was authored in, for every locale. |
@@ -75,7 +74,6 @@ defmodule PhoenixKitDashboards.Slot do
           provides: [String.t()],
           cardinality: :one | :many,
           allow_personal: boolean(),
-          allow_blank: boolean(),
           chrome: :view | :builder,
           priority: integer(),
           source: module() | nil
@@ -95,7 +93,6 @@ defmodule PhoenixKitDashboards.Slot do
             provides: [],
             cardinality: :one,
             allow_personal: true,
-            allow_blank: false,
             chrome: :view,
             priority: 500,
             source: nil
@@ -140,7 +137,6 @@ defmodule PhoenixKitDashboards.Slot do
          provides: normalize_provides(map[:provides]),
          cardinality: one_of(map[:cardinality], @cardinalities, :one),
          allow_personal: bool(map[:allow_personal], true),
-         allow_blank: bool(map[:allow_blank], false),
          chrome: one_of(map[:chrome], @chromes, :view),
          priority: int(map[:priority], 500),
          source: source

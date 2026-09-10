@@ -291,9 +291,9 @@ defmodule PhoenixKitDashboards do
   into core's page, and core keeps no dependency on this package.
 
   `cardinality: :many` because the owner asked for several home boards ("Site
-  health", "User activity", "Sales") shown as tabs. `allow_blank: false`
-  because an empty home reads as a broken install, and `chrome: :view` because
-  the home is a landing, not a workspace — editing happens in the builder.
+  health", "User activity", "Sales") shown as tabs, and `chrome: :view`
+  because the home is a landing, not a workspace — editing happens in the
+  builder.
   """
   @spec phoenix_kit_dashboard_slots() :: [map()]
   def phoenix_kit_dashboard_slots do
@@ -312,7 +312,6 @@ defmodule PhoenixKitDashboards do
         surface: :admin_home,
         cardinality: :many,
         allow_personal: true,
-        allow_blank: false,
         chrome: :view,
         priority: 10
       }

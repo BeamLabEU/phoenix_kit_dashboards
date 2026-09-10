@@ -311,7 +311,7 @@ widgets — a module defines a zero-arity function returning plain maps.
 | `module_key` | no | Gates the slot AND its generated tab on that module. |
 | `provides` | no | Context kinds supplied at render (`["projects.project"]`). |
 | `cardinality` | no | `:one` (default) or `:many` — several dashboards as tabs. |
-| `allow_personal`, `allow_blank`, `chrome`, `icon`, `description`, `priority` | no | Behaviour + presentation. |
+| `allow_personal`, `chrome`, `icon`, `description`, `priority` | no | Behaviour + presentation. |
 
 `phoenix_kit_dashboard_viewer_context/2` — `(kind, scope) -> id | nil`. Answers
 "which one is MINE" for a context kind. Only the module owning the record can
@@ -327,14 +327,6 @@ into it.
 REPLACE rather than merge, and only one role may win — chosen by an explicit
 integer `priority` (lower wins), because a viewer with two matching roles
 would otherwise resolve by whatever order the role list came back in.
-
-A placement carries a **policy**: `shared` (the default — everyone sees the
-bound dashboard), `template` (they see it, but editing hands them their own
-copy first) or `own` (nothing is shared; each person builds their own). An
-`own` placement names no dashboard, so `put/3` skips the dashboard checks for
-it and `health/1` does not call it broken — every other policy must name one,
-because a place that resolves to nothing is a broken page rather than a
-feature. A role placement's policy beats an everyone one's.
 
 The **personal** tier is reached through `Web.Personal` ("Make it mine" /
 "Use the shared one"), shared by every surface that renders a place so the two

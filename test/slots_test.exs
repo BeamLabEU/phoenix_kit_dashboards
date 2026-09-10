@@ -75,7 +75,6 @@ defmodule PhoenixKitDashboards.SlotsTest do
       assert slot.cardinality == :one
       assert slot.provides == []
       assert slot.chrome == :view
-      assert slot.allow_blank == false
       assert slot.allow_personal == true
     end
 
