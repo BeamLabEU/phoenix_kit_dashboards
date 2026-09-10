@@ -19,9 +19,10 @@ personal / system / role.
   `phoenix_kit_project_extensions/0` entry this module exports.
 - **Admin surface:** one visible tab **Dashboards** (`/admin/dashboards`,
   priority 650, group `:admin_modules`) plus four hidden tabs —
-  `dashboards/new`, `dashboards/:uuid/edit` (form), `dashboards/places`
-  (the placement control screen) and `dashboards/:uuid` (builder) — plus one
-  generated tab per declared `:module_tab` slot at `dashboards/places/<slug>`.
+  `dashboards/new`, `dashboards/:uuid/edit` (form) and `dashboards/:uuid`
+  (builder), one VISIBLE subtab **Places** (`dashboards/places`, the placement
+  control screen) — plus one generated tab per declared `:module_tab` slot at
+  `dashboards/places/<slug>`, hung under the DECLARING module's sidebar entry.
 - **Module key** `"dashboards"`; settings prefix `dashboards_` (only
   `dashboards_enabled` today).
 
@@ -128,6 +129,14 @@ Repo-local aliases:
 - **Tailwind:** `css_sources/0` returns `[:phoenix_kit_dashboards]`; core's
   `:phoenix_kit_css_sources` compiler wires the host's `@source` at compile
   time, so templates are scanned with no host configuration.
+- **Page layout:** an admin page wraps in
+  `<div class="flex flex-col mx-auto max-w-5xl px-4 py-6 gap-6">` and carries
+  **no in-page `<h1>`** — the admin header breadcrumb already renders
+  `@page_title`, so the page reclaims the space. Embedded surfaces
+  (`AdminHomeLive`, `ProjectDashboardLive`) add no container of their own: the
+  host page already pads them.
+- **Every name is a link.** A place opens its page, a dashboard opens its
+  builder — from Places, the library and a slot header alike.
 - **Form components** come from core:
   `PhoenixKitWeb.Components.Core.{Input, Select, Textarea, Checkbox}`
   (`<.input>` / `<.select>` / `<.textarea>` / `<.checkbox>`), which render the
@@ -318,6 +327,14 @@ into it.
 REPLACE rather than merge, and only one role may win — chosen by an explicit
 integer `priority` (lower wins), because a viewer with two matching roles
 would otherwise resolve by whatever order the role list came back in.
+
+The **personal** tier is reached through `Web.Personal` ("Make it mine" /
+"Use the shared one"), shared by every surface that renders a place so the two
+cannot drift. Forking copies the board on screen and places the copy for that
+person; it changes nothing anyone else sees. Resetting UNPLACES the copy and
+never deletes it — the work stays in the library. `clone/3` therefore strips
+`config["slot"]`: a copy is unplaced until someone says otherwise, or one
+person ends up with two dashboards claiming one place.
 
 **Binds** (`PhoenixKitDashboards.Binds`) resolve in the HOST, never the widget:
 the duck-typed contract forbids requiring widget changes, so the concrete value
