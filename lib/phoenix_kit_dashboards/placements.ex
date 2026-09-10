@@ -252,10 +252,9 @@ defmodule PhoenixKitDashboards.Placements do
     attrs = stringify(attrs)
 
     with {:ok, slot} <- fetch_slot(slot_key),
-         {:ok, dashboard} <- fetch_dashboard(attrs["dashboard_uuid"]),
-         :ok <- validate_shareable(dashboard),
-         :ok <- validate_type(dashboard, slot),
+         :ok <- validate_dashboard(attrs, slot),
          {:ok, placement} <- build(attrs),
+         :ok <- validate_policy(placement, slot),
          :ok <- validate_cardinality(slot, slot_key, placement) do
       write(slot_key, for_slot(slot_key) ++ [put_position(placement, slot_key)], opts)
     end
@@ -476,6 +475,9 @@ defmodule PhoenixKitDashboards.Placements do
     cond do
       is_nil(slot) -> :slot_gone
       not is_nil(scope) and not Slots.visible_for_scope?(slot, scope) -> :slot_unavailable
+      # An "own" placement shares nothing by design, so having no dashboard is
+      # its normal state, not a break.
+      placement["policy"] == "own" -> nil
       is_nil(Dashboards.get(placement["dashboard_uuid"])) -> :dashboard_gone
       true -> nil
     end
@@ -484,6 +486,23 @@ defmodule PhoenixKitDashboards.Placements do
   end
 
   # ── Validation ─────────────────────────────────────────────────────
+
+  # An "own" placement names no dashboard — there is nothing shared to name.
+  defp validate_dashboard(%{"policy" => "own"}, _slot), do: :ok
+
+  defp validate_dashboard(attrs, slot) do
+    with {:ok, dashboard} <- fetch_dashboard(attrs["dashboard_uuid"]),
+         :ok <- validate_shareable(dashboard) do
+      validate_type(dashboard, slot)
+    end
+  end
+
+  # Both policies that hand someone their own copy need the slot to allow one.
+  defp validate_policy(%{"policy" => policy}, %Slot{allow_personal: false})
+       when policy in ~w(template own),
+       do: {:error, :personal_not_allowed_here}
+
+  defp validate_policy(_placement, _slot), do: :ok
 
   defp fetch_slot(slot_key) do
     case Slots.get(slot_key) do
@@ -535,6 +554,7 @@ defmodule PhoenixKitDashboards.Placements do
      %{
        "audience" => "everyone",
        "dashboard_uuid" => attrs["dashboard_uuid"],
+       "policy" => policy(attrs["policy"]),
        "label" => blank_to_nil(attrs["label"])
      }}
   end
@@ -551,12 +571,59 @@ defmodule PhoenixKitDashboards.Placements do
            "role_uuid" => role_uuid,
            "priority" => int(attrs["priority"], 100),
            "dashboard_uuid" => attrs["dashboard_uuid"],
+           "policy" => policy(attrs["policy"]),
            "label" => blank_to_nil(attrs["label"])
          }}
     end
   end
 
   defp build(_attrs), do: {:error, :invalid_audience}
+
+  @policies ~w(shared template own)
+
+  # How a place behaves for someone who has no version of their own:
+  #
+  #   * `shared`   — they see the bound dashboard. The default, and today's
+  #                  behaviour.
+  #   * `template` — they see it too, but editing gives them their OWN copy
+  #                  first. The bound board is a starting point, not the
+  #                  company's board.
+  #   * `own`      — nobody shares anything here; each person builds their own.
+  #
+  # `own` needs no dashboard, which is why `put/3` skips the dashboard checks
+  # for it. Every other policy must name one — a place that resolves to
+  # nothing is a broken page, not a feature.
+  defp policy(value) when value in @policies, do: value
+  defp policy(_value), do: "shared"
+
+  @doc """
+  The policy of the placement a viewer resolved to, or `"shared"`.
+
+  Read by the surfaces to decide whether editing forks first (`template`) and
+  whether an empty place invites you to build your own (`own`).
+  """
+  @spec policy_for(String.t(), map() | nil) :: String.t()
+  def policy_for(slot_key, scope) when is_binary(slot_key) do
+    role_uuids = role_uuids(scope)
+
+    slot_key
+    |> for_slot()
+    |> Enum.filter(fn p ->
+      p["audience"] == "everyone" or
+        (p["audience"] == "role" and p["role_uuid"] in role_uuids)
+    end)
+    |> Enum.sort_by(&{audience_rank(&1), priority(&1), position(&1)})
+    |> case do
+      [%{"policy" => policy} | _] when policy in @policies -> policy
+      _ -> "shared"
+    end
+  end
+
+  def policy_for(_slot_key, _scope), do: "shared"
+
+  # A role placement is more specific than an everyone one, so its policy wins.
+  defp audience_rank(%{"audience" => "role"}), do: 0
+  defp audience_rank(_placement), do: 1
 
   defp same_audience?(a, b) do
     a["audience"] == b["audience"] and a["role_uuid"] == b["role_uuid"]

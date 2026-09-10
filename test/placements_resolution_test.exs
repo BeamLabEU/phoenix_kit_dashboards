@@ -10,6 +10,7 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
   """
   use PhoenixKitDashboards.DataCase, async: false
 
+  alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Placements
 
   defp put_blob(blob) do
@@ -231,6 +232,61 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
 
     test "an unknown slot is false, not a crash" do
       refute Placements.any_for_slot?("nope.not_a_slot")
+    end
+  end
+
+  describe "placement policies" do
+    test "an \"own\" placement needs no dashboard and is not reported as broken" do
+      assert {:ok, _} =
+               Placements.put("core.admin_home", %{"audience" => "everyone", "policy" => "own"})
+
+      # Nothing shared here BY DESIGN — the empty result is the invitation to
+      # build your own, not a gap to report.
+      assert {:everyone, []} = Placements.resolve("core.admin_home", nil)
+      assert Placements.policy_for("core.admin_home", nil) == "own"
+      assert Placements.health() == []
+    end
+
+    test "a template placement still names a dashboard and resolves to it" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        Dashboards.create(%{title: "Starting point", scope: "system", owner_user_uuid: user.uuid})
+
+      assert {:ok, _} =
+               Placements.put("core.admin_home", %{
+                 "audience" => "everyone",
+                 "policy" => "template",
+                 "dashboard_uuid" => dashboard.uuid
+               })
+
+      assert {:everyone, [seen]} = Placements.resolve("core.admin_home", nil)
+      assert seen.uuid == dashboard.uuid
+      assert Placements.policy_for("core.admin_home", nil) == "template"
+    end
+
+    test "an unknown policy falls back to shared rather than being stored" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        Dashboards.create(%{title: "D", scope: "system", owner_user_uuid: user.uuid})
+
+      {:ok, _} =
+        Placements.put("core.admin_home", %{
+          "audience" => "everyone",
+          "policy" => "nonsense",
+          "dashboard_uuid" => dashboard.uuid
+        })
+
+      assert Placements.policy_for("core.admin_home", nil) == "shared"
+    end
+
+    test "a placement with no policy at all reads as shared" do
+      put_blob(%{
+        "core.admin_home" => [%{"audience" => "everyone", "dashboard_uuid" => "x"}]
+      })
+
+      assert Placements.policy_for("core.admin_home", nil) == "shared"
     end
   end
 

@@ -51,6 +51,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
        query: "",
        open_slot: nil,
        form_audience: "everyone",
+       form_policy: "shared",
        error: nil
      )
      |> load()}
@@ -68,15 +69,24 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   end
 
   def handle_event("open", %{"slot" => slot_key}, socket) do
-    {:noreply, assign(socket, open_slot: slot_key, error: nil, form_audience: "everyone")}
+    {:noreply,
+     assign(socket,
+       open_slot: slot_key,
+       error: nil,
+       form_audience: "everyone",
+       form_policy: "shared"
+     )}
   end
 
   def handle_event("close", _params, socket) do
     {:noreply, assign(socket, open_slot: nil, error: nil)}
   end
 
-  def handle_event("set_audience", %{"audience" => audience}, socket) do
-    {:noreply, assign(socket, :form_audience, audience)}
+  def handle_event("set_audience", params, socket) do
+    {:noreply,
+     socket
+     |> assign(:form_audience, params["audience"] || socket.assigns.form_audience)
+     |> assign(:form_policy, params["policy"] || socket.assigns.form_policy)}
   end
 
   def handle_event("place", %{"slot" => slot_key} = params, socket) do
@@ -154,6 +164,9 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   defp error_message(:audience_already_placed),
     do: gettext("This place already shows a dashboard for that audience.")
 
+  defp error_message(:personal_not_allowed_here),
+    do: gettext("This place doesn't allow people to have their own version.")
+
   defp error_message(:role_required), do: gettext("Pick a role.")
   defp error_message(:unknown_dashboard), do: gettext("Pick a dashboard.")
   defp error_message(:unknown_slot), do: gettext("That place no longer exists.")
@@ -216,6 +229,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
           shareable={@shareable}
           roles={@roles}
           form_audience={@form_audience}
+          form_policy={@form_policy}
         />
       </section>
     </div>
@@ -228,6 +242,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   attr(:shareable, :list, required: true)
   attr(:roles, :list, required: true)
   attr(:form_audience, :string, required: true)
+  attr(:form_policy, :string, required: true)
 
   defp place_card(assigns) do
     ~H"""
@@ -276,6 +291,9 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
               {row.title}
             </.link>
             <span :if={is_nil(row.dashboard_uuid)} class="min-w-0 truncate">{row.title}</span>
+            <span :if={row.policy != "shared"} class="badge badge-outline badge-sm">
+              {policy_label(row.policy)}
+            </span>
             <span :if={row.audience == "role"} class="text-xs opacity-60">
               {gettext("priority")} {row.priority}
             </span>
@@ -323,7 +341,25 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
             <input type="number" name="priority" value="100" class="input input-sm input-bordered" />
           </label>
 
+          <%!-- Everything else on this form is WHO; this is WHAT KIND of
+          place it is. "Own" needs no dashboard at all, so the picker goes
+          away rather than sitting there asking for something meaningless. --%>
           <label class="form-control min-w-56">
+            <span class="label-text text-xs">{gettext("How it works")}</span>
+            <select name="policy" class="select select-sm select-bordered">
+              <option value="shared" selected={@form_policy == "shared"}>
+                {gettext("Everyone sees the same dashboard")}
+              </option>
+              <option value="template" selected={@form_policy == "template"}>
+                {gettext("A starting point people can customize")}
+              </option>
+              <option value="own" selected={@form_policy == "own"}>
+                {gettext("Everyone builds their own")}
+              </option>
+            </select>
+          </label>
+
+          <label :if={@form_policy != "own"} class="form-control min-w-56">
             <span class="label-text text-xs">{gettext("Dashboard")}</span>
             <select name="dashboard_uuid" class="select select-sm select-bordered">
               <option value="">{gettext("Pick a dashboard")}</option>
@@ -359,13 +395,21 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         audience_label: audience_label(placement),
         role_uuid: placement["role_uuid"],
         priority: placement["priority"] || 100,
+        policy: placement["policy"] || "shared",
         dashboard_uuid: placement["dashboard_uuid"],
         title:
           placement["label"] || (dashboard && dashboard.title) ||
-            gettext("(deleted dashboard)")
+            if(placement["policy"] == "own",
+              do: gettext("nothing shared"),
+              else: gettext("(deleted dashboard)")
+            )
       }
     end)
   end
+
+  defp policy_label("template"), do: gettext("a starting point")
+  defp policy_label("own"), do: gettext("everyone builds their own")
+  defp policy_label(_policy), do: nil
 
   defp audience_order(%{"audience" => "everyone"}), do: 0
   defp audience_order(_placement), do: 1

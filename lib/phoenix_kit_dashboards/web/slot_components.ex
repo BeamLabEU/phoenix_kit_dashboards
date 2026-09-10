@@ -34,6 +34,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
   attr(:scope, :any, default: nil)
   attr(:can_fork?, :boolean, default: false)
   attr(:mine?, :boolean, default: false)
+  attr(:fork_on_edit?, :boolean, default: false)
 
   def slot_header(assigns) do
     ~H"""
@@ -115,8 +116,21 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         <.icon name="hero-arrows-right-left" class="h-4 w-4" />
         {gettext("Change")}
       </.link>
+      <%!-- On a TEMPLATE place the bound board is a starting point, not the
+      company's, so editing takes a copy first and the person changes their
+      own. Everywhere else this is the plain link it has always been. --%>
+      <button
+        :if={@fork_on_edit?}
+        type="button"
+        phx-click="fork_and_edit"
+        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        title={gettext("Take your own copy and edit that")}
+      >
+        <.icon name="hero-pencil-square" class="h-4 w-4" />
+        {gettext("Customize")}
+      </button>
       <.link
-        :if={Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
+        :if={not @fork_on_edit? and Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
         navigate={Paths.builder(@active.uuid)}
         class="btn btn-ghost btn-sm shrink-0 gap-1"
       >
@@ -129,16 +143,34 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
 
   attr(:slot, :any, default: nil)
   attr(:scope, :any, default: nil)
+  attr(:can_create_own?, :boolean, default: false)
 
   def slot_empty(assigns) do
     ~H"""
     <div class="card border border-dashed border-base-300 bg-base-100">
       <div class="card-body items-center gap-2 py-10 text-center">
         <.icon name="hero-squares-2x2" class="h-8 w-8 opacity-40" />
-        <p class="text-sm opacity-70">
+        <p :if={not @can_create_own?} class="text-sm opacity-70">
           {gettext("No dashboard is shown here yet.")}
         </p>
-        <.link :if={@slot} navigate={Paths.places()} class="btn btn-sm btn-primary">
+        <%!-- An `own` place shares nothing by design, so the empty state is
+        not a gap to report — it is the invitation. --%>
+        <p :if={@can_create_own?} class="text-sm opacity-70">
+          {gettext("This page is yours to build.")}
+        </p>
+        <button
+          :if={@can_create_own?}
+          type="button"
+          phx-click="create_own"
+          class="btn btn-sm btn-primary"
+        >
+          {gettext("Build mine")}
+        </button>
+        <.link
+          :if={@slot and not @can_create_own? and Helpers.can_manage_places?(@scope)}
+          navigate={Paths.places()}
+          class="btn btn-sm btn-primary"
+        >
           {gettext("Choose a dashboard")}
         </.link>
       </div>

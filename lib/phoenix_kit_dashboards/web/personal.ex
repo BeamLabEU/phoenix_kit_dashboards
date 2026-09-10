@@ -91,9 +91,46 @@ defmodule PhoenixKitDashboards.Web.Personal do
         match?({:ok, _}, forkable_slot(socket)) and
         match?(%Dashboard{}, socket.assigns[:active])
 
+    policy = socket.assigns[:policy] || "shared"
+    forkable? = match?({:ok, _}, actor(socket)) and match?({:ok, _}, forkable_slot(socket))
+
     socket
     |> assign(:can_fork?, can_fork?)
     |> assign(:mine?, mine?)
+    # A `template` place says the bound board is a starting point, so editing
+    # should hand you your own copy rather than change everyone's.
+    |> assign(:fork_on_edit?, policy == "template" and can_fork?)
+    # An `own` place shares nothing; an empty one invites you to build yours.
+    |> assign(:can_create_own?, policy == "own" and forkable? and not mine?)
+  end
+
+  @doc """
+  Start a brand-new personal dashboard in this place.
+
+  The `own` policy's path: nothing is shared here, so there is nothing to copy
+  and the person begins with an empty board of their own.
+  """
+  @spec create_own(Phoenix.LiveView.Socket.t(), (Phoenix.LiveView.Socket.t() ->
+                                                   Phoenix.LiveView.Socket.t())) ::
+          Phoenix.LiveView.Socket.t()
+  def create_own(socket, reload) do
+    with {:ok, user_uuid} <- actor(socket),
+         {:ok, slot} <- forkable_slot(socket),
+         opts = [actor_uuid: user_uuid],
+         {:ok, created} <-
+           Dashboards.create(
+             %{
+               title: Slot.localized_name(slot),
+               scope: "personal",
+               owner_user_uuid: user_uuid
+             },
+             opts
+           ),
+         {:ok, _placed} <- Placements.put_personal(created, slot.key, opts) do
+      reload.(socket)
+    else
+      _ -> socket
+    end
   end
 
   defp actor(socket) do
