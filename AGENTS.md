@@ -328,6 +328,14 @@ REPLACE rather than merge, and only one role may win — chosen by an explicit
 integer `priority` (lower wins), because a viewer with two matching roles
 would otherwise resolve by whatever order the role list came back in.
 
+A placement carries a **policy**: `shared` (the default — everyone sees the
+bound dashboard), `template` (they see it, but editing hands them their own
+copy first) or `own` (nothing is shared; each person builds their own). An
+`own` placement names no dashboard, so `put/3` skips the dashboard checks for
+it and `health/1` does not call it broken — every other policy must name one,
+because a place that resolves to nothing is a broken page rather than a
+feature. A role placement's policy beats an everyone one's.
+
 The **personal** tier is reached through `Web.Personal` ("Make it mine" /
 "Use the shared one"), shared by every surface that renders a place so the two
 cannot drift. Forking copies the board on screen and places the copy for that
