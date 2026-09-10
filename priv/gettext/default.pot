@@ -11,7 +11,7 @@
 msgid ""
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:192
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:193
 #, elixir-autogen, elixir-format
 msgid "%{count} widget"
 msgid_plural "%{count} widgets"
@@ -28,7 +28,7 @@ msgstr ""
 msgid "A free-text note for reminders, links, or context — Markdown supported."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:225
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:226
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr ""
@@ -49,7 +49,7 @@ msgstr ""
 msgid "Add widgets from the panel on the right."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1109
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1112
 #, elixir-autogen, elixir-format
 msgid "Allow smaller than recommended"
 msgstr ""
@@ -69,7 +69,7 @@ msgstr ""
 msgid "Bring to front"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:965
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:968
 #, elixir-autogen, elixir-format
 msgid "Built-in"
 msgstr ""
@@ -79,13 +79,13 @@ msgstr ""
 msgid "By role"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1140
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1143
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:925
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:928
 #, elixir-autogen, elixir-format
 msgid "Click to add, or drag onto the dashboard"
 msgstr ""
@@ -95,22 +95,22 @@ msgstr ""
 msgid "Clock"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:238
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:239
 #, elixir-autogen, elixir-format
 msgid "Clone"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:236
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:237
 #, elixir-autogen, elixir-format
 msgid "Cloning…"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:907
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:910
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1095
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1098
 #, elixir-autogen, elixir-format
 msgid "Column"
 msgstr ""
@@ -155,12 +155,12 @@ msgstr ""
 msgid "Create"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:154
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:155
 #, elixir-autogen, elixir-format
 msgid "Create dashboard"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:166
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:167
 #, elixir-autogen, elixir-format
 msgid "Create your first dashboard"
 msgstr ""
@@ -219,12 +219,12 @@ msgid "Dashboards"
 msgstr ""
 
 #: lib/phoenix_kit_dashboards/web/builder_components.ex:197
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:248
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:249
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:245
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:246
 #, elixir-autogen, elixir-format
 msgid "Delete this dashboard?"
 msgstr ""
@@ -234,7 +234,7 @@ msgstr ""
 msgid "Delete this layout? Its placements are removed; the widgets stay available in the other layouts."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:246
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:247
 #, elixir-autogen, elixir-format
 msgid "Deleting…"
 msgstr ""
@@ -259,12 +259,12 @@ msgstr ""
 msgid "Drag to resize"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1113
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1116
 #, elixir-autogen, elixir-format
 msgid "Drops this widget's minimum size to 1×1 — it may render cramped below the recommended size."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:231
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr ""
@@ -289,7 +289,7 @@ msgstr ""
 msgid "Full screen"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:141
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:142
 #, elixir-autogen, elixir-format
 msgid "Grid"
 msgstr ""
@@ -304,8 +304,8 @@ msgstr ""
 msgid "Grid size (columns × rows)"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1049
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1084
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1052
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1087
 #, elixir-autogen, elixir-format
 msgid "Height"
 msgstr ""
@@ -364,7 +364,7 @@ msgstr ""
 msgid "No dashboard linked yet — pick a shared dashboard in the Modules panel."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:162
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:163
 #, elixir-autogen, elixir-format
 msgid "No dashboards yet."
 msgstr ""
@@ -384,7 +384,7 @@ msgstr ""
 msgid "Note"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:221
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:222
 #, elixir-autogen, elixir-format
 msgid "Open"
 msgstr ""
@@ -399,7 +399,7 @@ msgstr ""
 msgid "Personal"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:140
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:141
 #, elixir-autogen, elixir-format
 msgid "Pixel"
 msgstr ""
@@ -441,7 +441,7 @@ msgstr ""
 msgid "Role"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1103
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1106
 #, elixir-autogen, elixir-format
 msgid "Row"
 msgstr ""
@@ -451,13 +451,13 @@ msgstr ""
 msgid "Rows"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1148
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1151
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:268
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1145
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1148
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:263
 #, elixir-autogen, elixir-format
 msgid "Saving…"
@@ -498,12 +498,12 @@ msgstr ""
 msgid "Show timezone"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1032
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1035
 #, elixir-autogen, elixir-format
 msgid "Size"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1031
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1034
 #, elixir-autogen, elixir-format
 msgid "Size & position (px)"
 msgstr ""
@@ -548,12 +548,12 @@ msgstr ""
 msgid "Timezone"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1119
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1122
 #, elixir-autogen, elixir-format
 msgid "Tip: drag the bottom-right corner to resize."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1121
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1124
 #, elixir-autogen, elixir-format
 msgid "Tip: drag the widget by its grip to any cell; drag the bottom-right corner to resize."
 msgstr ""
@@ -576,7 +576,7 @@ msgid "Untitled Dashboard"
 msgstr ""
 
 #: lib/phoenix_kit_dashboards/web/builder_components.ex:556
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1024
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1027
 #, elixir-autogen, elixir-format
 msgid "View"
 msgstr ""
@@ -586,12 +586,12 @@ msgstr ""
 msgid "Visibility"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:901
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:904
 #, elixir-autogen, elixir-format
 msgid "Widget catalog"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1005
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1008
 #, elixir-autogen, elixir-format
 msgid "Widget settings"
 msgstr ""
@@ -601,18 +601,18 @@ msgstr ""
 msgid "Widgets"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1041
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1076
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1044
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1079
 #, elixir-autogen, elixir-format
 msgid "Width"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1056
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1059
 #, elixir-autogen, elixir-format
 msgid "X"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1063
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1066
 #, elixir-autogen, elixir-format
 msgid "Y"
 msgstr ""
@@ -694,7 +694,7 @@ msgstr ""
 msgid "A role"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1197
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1200
 #, elixir-autogen, elixir-format
 msgid "A specific one"
 msgstr ""
@@ -704,7 +704,7 @@ msgstr ""
 msgid "A wall-screen dashboard can't be used as an admin page."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards.ex:236
+#: lib/phoenix_kit_dashboards.ex:304
 #, elixir-autogen, elixir-format
 msgid "Admin home"
 msgstr ""
@@ -740,7 +740,7 @@ msgstr ""
 msgid "Done"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1211
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1214
 #, elixir-autogen, elixir-format
 msgid "Each person sees their own."
 msgstr ""
@@ -757,7 +757,7 @@ msgstr ""
 msgid "Everyone"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1208
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1211
 #, elixir-autogen, elixir-format
 msgid "Follows whichever page this dashboard is shown on."
 msgstr ""
@@ -767,7 +767,7 @@ msgstr ""
 msgid "For your role"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1196
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1199
 #, elixir-autogen, elixir-format
 msgid "Mine"
 msgstr ""
@@ -787,12 +787,12 @@ msgstr ""
 msgid "Nothing shown here — people see this module's normal page."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:851
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:854
 #, elixir-autogen, elixir-format
 msgid "Only changes what you see here."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:873
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:876
 #, elixir-autogen, elixir-format
 msgid "Pick a %{subject}"
 msgstr ""
@@ -824,7 +824,7 @@ msgstr ""
 msgid "Places"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:836
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:839
 #, elixir-autogen, elixir-format
 msgid "Preview as"
 msgstr ""
@@ -844,7 +844,7 @@ msgstr ""
 msgid "Show it here"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:800
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:803
 #, elixir-autogen, elixir-format
 msgid "Shown when this dashboard is on a page with a %{subject}."
 msgstr ""
@@ -864,7 +864,7 @@ msgstr ""
 msgid "That place no longer exists."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1195
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1198
 #, elixir-autogen, elixir-format
 msgid "The one this page is about"
 msgstr ""
@@ -874,7 +874,7 @@ msgstr ""
 msgid "This place already shows a dashboard for that audience."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:1203
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:1206
 #, elixir-autogen, elixir-format
 msgid "Which one"
 msgstr ""
@@ -904,32 +904,32 @@ msgstr ""
 msgid "That dashboard is limited to one role. Only shared dashboards can go here."
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:128
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:129
 #, elixir-autogen, elixir-format
 msgid "%{place} — everyone"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:126
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:127
 #, elixir-autogen, elixir-format
 msgid "%{place} — for a role"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:123
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:124
 #, elixir-autogen, elixir-format
 msgid "%{place} — only you"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:200
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:201
 #, elixir-autogen, elixir-format
 msgid "Shown in"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:205
+#: lib/phoenix_kit_dashboards/web/dashboards_live.ex:206
 #, elixir-autogen, elixir-format
 msgid "nowhere yet"
 msgstr ""
 
-#: lib/phoenix_kit_dashboards/web/builder_components.ex:799
+#: lib/phoenix_kit_dashboards/web/builder_components.ex:800
 #, elixir-autogen, elixir-format
 msgid "Shown when this dashboard is on a page that provides what it needs."
 msgstr ""
@@ -937,4 +937,9 @@ msgstr ""
 #: lib/phoenix_kit_dashboards/web/places_live.ex:371
 #, elixir-autogen, elixir-format
 msgid "about one record"
+msgstr ""
+
+#: lib/phoenix_kit_dashboards.ex:305
+#, elixir-autogen, elixir-format
+msgid "The first page you see after signing in"
 msgstr ""

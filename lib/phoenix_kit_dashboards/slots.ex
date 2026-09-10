@@ -349,13 +349,28 @@ defmodule PhoenixKitDashboards.Slots do
 
   # ── Presentation ───────────────────────────────────────────────────
 
-  defp provider_label(%Slot{module_key: nil, source: source}), do: module_label(source)
+  # The heading a slot is filed under. `module_name/0` is an untranslated
+  # literal, so it goes through the SLOT's own backend — the module that
+  # authored the name is the one whose catalogue holds it.
+  defp provider_label(%Slot{} = slot) do
+    slot
+    |> provider_module()
+    |> module_label()
+    |> localize(slot)
+  end
 
-  defp provider_label(%Slot{module_key: key, source: source}) do
-    case module_by_key(key) do
-      nil -> module_label(source)
-      module -> module_label(module)
-    end
+  defp provider_module(%Slot{module_key: nil, source: source}), do: source
+
+  defp provider_module(%Slot{module_key: key, source: source}) do
+    module_by_key(key) || source
+  end
+
+  defp localize(label, %Slot{gettext_backend: nil}), do: label
+
+  defp localize(label, %Slot{gettext_backend: backend} = slot) do
+    Gettext.dgettext(backend, slot.gettext_domain, label)
+  rescue
+    _ -> label
   end
 
   defp module_label(nil), do: "General"

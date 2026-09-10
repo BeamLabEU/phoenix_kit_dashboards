@@ -232,8 +232,7 @@ defmodule PhoenixKitDashboards do
       dgettext_noop("default", "New Dashboard"),
       dgettext_noop("default", "Dashboard Settings"),
       dgettext_noop("default", "Dashboard Builder"),
-      dgettext_noop("default", "Places"),
-      dgettext_noop("default", "Admin home")
+      dgettext_noop("default", "Places")
     ]
   end
 
@@ -298,8 +297,14 @@ defmodule PhoenixKitDashboards do
     [
       %{
         key: "core.admin_home",
-        name: "Admin home",
-        description: "The first page you see after signing in",
+        # Our own strings, so our own backend — the same rule every provider
+        # follows. Without it this slot's name rendered English in every
+        # locale, which is exactly the trap the sibling modules' declarations
+        # avoid. The noop anchors keep both msgids in `default.pot`.
+        name: gettext_noop("Admin home"),
+        description: gettext_noop("The first page you see after signing in"),
+        gettext_backend: PhoenixKitDashboards.Gettext,
+        gettext_domain: "default",
         icon: "hero-home",
         surface: :admin_home,
         cardinality: :many,
