@@ -21,12 +21,14 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
       actor_opts: 1,
       user_role_uuids: 1,
       scope_label: 1,
+      translate_catalog: 1,
       viewable_by?: 2,
       manageable_by?: 2
     ]
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Schemas.Dashboard
 
   @impl true
@@ -93,12 +95,35 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
   end
 
   defp load_dashboards(socket) do
-    dashboards = Dashboards.list_for_user(actor_uuid(socket), user_role_uuids(socket))
+    actor = actor_uuid(socket)
+    dashboards = Dashboards.list_for_user(actor, user_role_uuids(socket))
+
+    # One map for the whole list rather than a lookup per card: `places_for/2`
+    # reads the placement blob, and calling it once per dashboard would read it
+    # once per card.
+    places = Map.new(dashboards, &{&1.uuid, Placements.places_for(&1.uuid, actor)})
 
     socket
     |> assign(:dashboards, dashboards)
-    |> assign(:current_user_uuid, actor_uuid(socket))
+    |> assign(:places, places)
+    |> assign(:current_user_uuid, actor)
   end
+
+  # A place's chip. Prefers the placement's own label (so "Quarterly Sales
+  # Dashboard 2026" can read as "Sales" where it is shown), then the slot's
+  # name, and falls back to the raw key only when the declaring module is gone
+  # — which is itself the useful signal.
+  defp place_label(%{label: label}) when is_binary(label) and label != "", do: label
+  defp place_label(%{slot: %{name: name}}), do: translate_catalog(name)
+  defp place_label(%{slot_key: key}), do: key
+
+  defp place_title(%{audience: "personal"} = place),
+    do: gettext("%{place} — only you", place: place_label(place))
+
+  defp place_title(%{audience: "role"} = place),
+    do: gettext("%{place} — for a role", place: place_label(place))
+
+  defp place_title(place), do: gettext("%{place} — everyone", place: place_label(place))
 
   # Translated label for a scope enum (the raw value renders as a badge).
   defp type_icon(dashboard) do
@@ -164,6 +189,27 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
               <span>
                 {ngettext("%{count} widget", "%{count} widgets", length(dashboard.layout))}
               </span>
+            </p>
+            <%!-- WHERE this dashboard is shown. Without it discovery only runs
+            one way — a place tells you what fills it, but a dashboard tells
+            you nothing about where it appears, so it is possible to edit the
+            company's admin home without realising that is what it is. --%>
+            <p class="flex flex-wrap items-center gap-1 text-xs">
+              <span class="text-base-content/50">{gettext("Shown in")}:</span>
+              <span
+                :if={@places[dashboard.uuid] in [nil, []]}
+                class="text-base-content/40"
+              >
+                {gettext("nowhere yet")}
+              </span>
+              <.link
+                :for={place <- @places[dashboard.uuid] || []}
+                navigate={Paths.places()}
+                class="badge badge-ghost badge-sm hover:badge-neutral"
+                title={place_title(place)}
+              >
+                {place_label(place)}
+              </.link>
             </p>
             <%!-- Primary action stays a visible button; secondary actions live
             in the canonical <.table_row_menu> kebab (staff/entities pattern). --%>

@@ -161,7 +161,10 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       <%!-- Settings for the ACTIVE layout: rename/delete plus its grid size
       and the Fit-screen action — dimension controls live here, out of the
       bar (they're a deliberate per-layout setting, not a view control). --%>
-      <div class="dropdown dropdown-end shrink-0">
+      <%!-- START-aligned, not end: this gear sits at the LEFT of the bar, just
+      after the layout tabs, so an end-aligned panel extends its full width
+      leftward — off the pane and under the admin sidebar. --%>
+      <div class="dropdown shrink-0">
         <button
           type="button"
           tabindex="0"

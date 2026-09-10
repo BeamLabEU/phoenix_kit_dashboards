@@ -179,9 +179,34 @@ defmodule PhoenixKitDashboards.Slots do
       parent: slot.parent_tab,
       group: :admin_modules,
       match: :exact,
+      # An EMPTY place is navigation nobody asked for: a staff member should
+      # not find a "Projects dashboard" tab under Projects that only ever says
+      # "nothing here". Someone who can manage dashboards still sees it, since
+      # that is how they discover the place exists and fill it.
+      visible: &slot_tab_visible?(slot.key, &1),
       live_view: {PhoenixKitDashboards.Web.SlotLive, :show},
       metadata: %{slot_key: slot.key}
     }
+  end
+
+  @doc false
+  # Runs on EVERY sidebar render, so it stays to one cached settings read and a
+  # permission check — no dashboard loads, no per-slot queries.
+  @spec slot_tab_visible?(String.t(), map() | nil) :: boolean()
+  def slot_tab_visible?(slot_key, scope) do
+    PhoenixKitDashboards.Placements.any_for_slot?(slot_key) or can_manage?(scope)
+  rescue
+    # Never hide a tab because a check blew up — an unexpectedly missing tab is
+    # harder to diagnose than an empty one.
+    _ -> true
+  end
+
+  defp can_manage?(nil), do: false
+
+  defp can_manage?(scope) do
+    Code.ensure_loaded?(Scope) and Scope.has_module_access?(scope, "dashboards")
+  rescue
+    _ -> false
   end
 
   @doc """

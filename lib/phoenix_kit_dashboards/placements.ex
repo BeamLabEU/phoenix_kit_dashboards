@@ -375,6 +375,83 @@ defmodule PhoenixKitDashboards.Placements do
 
   def slot_of(_dashboard), do: nil
 
+  # ── Reverse lookup ─────────────────────────────────────────────────
+
+  @doc """
+  The places a dashboard is shown, for the library's "Shown in" column.
+
+  Placements are stored by SLOT, so without this the discovery only runs one
+  way: from a place you can see what fills it, but opening a dashboard tells
+  you nothing about where it appears. That asymmetry is exactly how someone
+  ends up editing a board without realising it is the company's admin home.
+
+  Returns `[%{slot_key:, slot:, audience:, role_uuid:, label:}]`, shared
+  placements first and then the viewer's own personal placement if they have
+  one. `slot` is `nil` when the declaring module is gone — the entry is still
+  listed, because "shown somewhere that no longer exists" is what an
+  administrator needs to see.
+  """
+  @spec places_for(String.t(), String.t() | nil) :: [map()]
+  def places_for(dashboard_uuid, user_uuid \\ nil)
+
+  def places_for(dashboard_uuid, user_uuid) when is_binary(dashboard_uuid) do
+    shared =
+      for {slot_key, placements} <- all(),
+          placement <- placements,
+          placement["dashboard_uuid"] == dashboard_uuid do
+        %{
+          slot_key: slot_key,
+          slot: Slots.get(slot_key),
+          audience: placement["audience"],
+          role_uuid: placement["role_uuid"],
+          label: placement["label"]
+        }
+      end
+
+    Enum.sort_by(shared, & &1.slot_key) ++ personal_place(dashboard_uuid, user_uuid)
+  end
+
+  def places_for(_dashboard_uuid, _user_uuid), do: []
+
+  defp personal_place(dashboard_uuid, user_uuid) when is_binary(user_uuid) do
+    with %Dashboard{} = dashboard <- Dashboards.get(dashboard_uuid),
+         true <- dashboard.owner_user_uuid == user_uuid,
+         slot_key when is_binary(slot_key) <- slot_of(dashboard) do
+      [
+        %{
+          slot_key: slot_key,
+          slot: Slots.get(slot_key),
+          audience: "personal",
+          role_uuid: nil,
+          label: nil
+        }
+      ]
+    else
+      _ -> []
+    end
+  rescue
+    _ -> []
+  end
+
+  defp personal_place(_dashboard_uuid, _user_uuid), do: []
+
+  @doc """
+  Whether any shared placement names this slot at all.
+
+  Cheap on purpose — one cached settings read, no dashboard loads. The sidebar
+  asks it for every slot tab on every render, so it must not turn navigation
+  into a query storm.
+  """
+  @spec any_for_slot?(String.t()) :: boolean()
+  def any_for_slot?(slot_key) when is_binary(slot_key) do
+    case Map.get(all(), slot_key) do
+      [_ | _] -> true
+      _ -> false
+    end
+  end
+
+  def any_for_slot?(_slot_key), do: false
+
   # ── Health ─────────────────────────────────────────────────────────
 
   @doc """

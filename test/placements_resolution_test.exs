@@ -146,6 +146,94 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
     end
   end
 
+  describe "places_for/2 — the reverse lookup behind \"Shown in\"" do
+    test "reports every place a dashboard is bound to" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Everywhere",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      {:ok, _} =
+        Placements.put("core.admin_home", %{
+          "audience" => "everyone",
+          "dashboard_uuid" => dashboard.uuid
+        })
+
+      assert [%{slot_key: "core.admin_home", audience: "everyone"}] =
+               Placements.places_for(dashboard.uuid)
+    end
+
+    test "an unbound dashboard is shown nowhere" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Library only",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      assert Placements.places_for(dashboard.uuid) == []
+    end
+
+    test "a placement whose slot is gone is still listed" do
+      # "Shown somewhere that no longer exists" is precisely what an
+      # administrator needs to see, so the entry survives with slot: nil.
+      put_blob(%{
+        "gone.slot" => [%{"audience" => "everyone", "dashboard_uuid" => "abc"}]
+      })
+
+      assert [%{slot_key: "gone.slot", slot: nil}] = Placements.places_for("abc")
+    end
+
+    test "another person's personal placement is never revealed" do
+      owner = PhoenixKitDashboards.Fixtures.user_fixture()
+      other = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, personal} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Mine",
+          scope: "personal",
+          owner_user_uuid: owner.uuid
+        })
+
+      {:ok, _} = Placements.put_personal(personal, "core.admin_home")
+
+      assert [%{audience: "personal"}] = Placements.places_for(personal.uuid, owner.uuid)
+      assert Placements.places_for(personal.uuid, other.uuid) == []
+    end
+  end
+
+  describe "any_for_slot?/1 — the sidebar's cheap check" do
+    test "false with nothing bound, true once something is" do
+      refute Placements.any_for_slot?("core.admin_home")
+
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "D",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      Placements.put("core.admin_home", %{
+        "audience" => "everyone",
+        "dashboard_uuid" => dashboard.uuid
+      })
+
+      assert Placements.any_for_slot?("core.admin_home")
+    end
+
+    test "an unknown slot is false, not a crash" do
+      refute Placements.any_for_slot?("nope.not_a_slot")
+    end
+  end
+
   describe "put/3 refusals" do
     test "an unknown dashboard is refused" do
       assert {:error, :unknown_dashboard} =
