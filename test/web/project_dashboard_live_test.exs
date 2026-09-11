@@ -285,6 +285,53 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLiveTest do
     end
   end
 
+  describe "stale subscriptions" do
+    setup do
+      {:ok, a} = Dashboards.create(%{title: "Board A", scope: "system"})
+      {:ok, a} = Dashboards.add_widget(a, "core.note")
+      {:ok, b} = Dashboards.create(%{title: "Board B", scope: "system"})
+      {:ok, b} = Dashboards.add_widget(b, "core.note")
+      {:ok, a: a, b: b, viewer: user_fixture()}
+    end
+
+    # This pane subscribes to whichever dashboard it resolves to and never
+    # unsubscribes, so after a re-point it is still listening to the old one.
+    test "an edit to a board this tab no longer shows does not swap it back",
+         %{conn: conn, a: a, b: b, viewer: viewer} do
+      {:ok, view, html} = mount_tab(conn, %{"dashboard_uuid" => a.uuid}, user: viewer)
+      assert html =~ "Board A"
+
+      # Simulate the re-point: the pane is now showing B, but its subscription
+      # to A is still live, so A's broadcast still arrives here.
+      send(view.pid, {:dashboard_updated, %{b | title: "Board B"}})
+      send(view.pid, {:dashboard_updated, %{a | title: "Board A renamed"}})
+
+      html = render(view)
+      assert html =~ "Board A renamed"
+      refute html =~ "Board B"
+    end
+
+    test "deleting a board this tab no longer shows does not blank it",
+         %{conn: conn, a: a, b: b, viewer: viewer} do
+      {:ok, view, _html} = mount_tab(conn, %{"dashboard_uuid" => a.uuid}, user: viewer)
+
+      send(view.pid, {:dashboard_deleted, b.uuid})
+
+      html = render(view)
+      assert html =~ "Board A"
+      refute html =~ "no longer exists"
+    end
+
+    test "deleting the board it IS showing still blanks it",
+         %{conn: conn, a: a, viewer: viewer} do
+      {:ok, view, _html} = mount_tab(conn, %{"dashboard_uuid" => a.uuid}, user: viewer)
+
+      send(view.pid, {:dashboard_deleted, a.uuid})
+
+      assert render(view) =~ "no longer exists"
+    end
+  end
+
   describe "the provider contract" do
     test "descriptor shape the projects hub consumes" do
       assert [ext] = PhoenixKitDashboards.phoenix_kit_project_extensions()

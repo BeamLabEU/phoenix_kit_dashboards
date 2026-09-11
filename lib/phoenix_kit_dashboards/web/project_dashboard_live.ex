@@ -67,6 +67,7 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Registry
   alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Web.Helpers
   alias PhoenixKitDashboards.Widget
 
   @refresh_tick_ms 1000
@@ -75,6 +76,8 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
 
   @impl true
   def mount(_params, session, socket) do
+    Helpers.put_embed_locale(session)
+
     socket =
       socket
       # THE context this tab supplies. Without it a dashboard shown inside
@@ -108,7 +111,15 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   # ── Live sync ─────────────────────────────────────────────────────
 
   @impl true
-  def handle_info({:dashboard_updated, %Dashboard{} = dashboard}, socket) do
+  # Only the board actually on screen. This pane subscribes to whichever
+  # dashboard it resolves to and never unsubscribes, so once a placement is
+  # re-pointed it is still listening to the previous one — without this guard
+  # an edit to the OLD board would swap it back onto a project it is no longer
+  # placed on. `BuilderLive` has always guarded this; this view did not.
+  def handle_info(
+        {:dashboard_updated, %Dashboard{uuid: uuid} = dashboard},
+        %{assigns: %{dashboard: %Dashboard{uuid: uuid}}} = socket
+      ) do
     # Adopt the authoritative post-write struct; re-check the shared-scope
     # rule (a re-scope away downgrades this pane on the spot). mode +
     # design_h refresh too — the render branches on them (final panel
@@ -128,7 +139,12 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
      |> maybe_schedule_refresh()}
   end
 
-  def handle_info({:dashboard_deleted, _uuid}, socket) do
+  # Same guard on the delete side: a stale subscription's delete must not
+  # blank a pane that is showing a different, healthy board.
+  def handle_info(
+        {:dashboard_deleted, uuid},
+        %{assigns: %{dashboard: %Dashboard{uuid: uuid}}} = socket
+      ) do
     {:noreply, assign(socket, dashboard: nil, state: :missing)}
   end
 

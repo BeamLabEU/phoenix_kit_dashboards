@@ -43,6 +43,8 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
 
   @impl true
   def mount(_params, session, socket) do
+    Helpers.put_embed_locale(session)
+
     if connected?(socket), do: Placements.subscribe()
 
     socket =

@@ -125,6 +125,33 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   def manageable_by?(_dashboard, _actor_uuid), do: true
 
   @doc """
+  Apply the locale the host put in an EMBED session.
+
+  `live_render/3` spawns a FRESH process and the Gettext locale lives in the
+  process dictionary, so it is not inherited from the page around it. Both
+  hosts already send the key — core's `/admin` and the projects hub — and
+  without this every string these views render falls back to the backend
+  default while the page around them is correctly translated, which reads as a
+  half-translated page rather than as missing wiring.
+
+  Both backends are set: this module's own for its strings, and core's for
+  anything rendered through a core component.
+  """
+  @spec put_embed_locale(map()) :: :ok | nil
+  def put_embed_locale(session) when is_map(session) do
+    case Map.get(session, "locale") do
+      locale when is_binary(locale) and locale != "" ->
+        Gettext.put_locale(PhoenixKitDashboards.Gettext, locale)
+        Gettext.put_locale(PhoenixKitWeb.Gettext, locale)
+
+      _ ->
+        :ok
+    end
+  end
+
+  def put_embed_locale(_session), do: :ok
+
+  @doc """
   Reconstruct the viewer's user + scope from an EMBED session.
 
   A dashboard rendered with `live_render/3` inside another page (the projects

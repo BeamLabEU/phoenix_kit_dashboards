@@ -507,8 +507,9 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
     >
       <%!-- The WHOLE top bar is the drag handle (the drag hooks ignore
       pointer-downs on the buttons inside it); the grip icon is just the visual
-      affordance. Readonly (the project-tab viewer) drops the bar entirely —
-      widgets render frameless, just their bodies. --%>
+      affordance. Readonly (the project-tab viewer and the placed surfaces)
+      drops the bar and the resize grip; the card itself keeps its border,
+      shadow and background, so only the chrome goes, not the frame. --%>
       <div
         :if={not @readonly}
         class={[

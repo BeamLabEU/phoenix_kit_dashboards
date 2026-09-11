@@ -16,7 +16,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   require Logger
 
   import PhoenixKitDashboards.Web.Helpers,
-    only: [actor_uuid: 1, actor_opts: 1, list_roles: 0, manageable_by?: 2]
+    only: [actor_uuid: 1, actor_opts: 1, list_roles: 0, manageable_by?: 2, viewable_by?: 2]
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Paths
@@ -46,7 +46,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
 
   defp load_dashboard(socket, uuid) do
     with %Dashboard{} = dashboard <- uuid && Dashboards.get(uuid),
-         true <- manageable_by?(dashboard, actor_uuid(socket)) do
+         true <- editable_by?(dashboard, socket) do
       {:noreply,
        socket
        |> assign(:dashboard, dashboard)
@@ -116,7 +116,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
     # this form sat open; fail closed like a fresh load would.
     fresh = Dashboards.get(dashboard.uuid)
 
-    if is_nil(fresh) or not manageable_by?(fresh, actor_uuid(socket)) do
+    if is_nil(fresh) or not editable_by?(fresh, socket) do
       {:noreply,
        socket
        |> put_flash(:error, gettext("Dashboard not found."))
@@ -153,17 +153,40 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
     end
   end
 
+  # BOTH gates, the way the manage page and the builder pair them.
+  # `manageable_by?/2` only restricts PERSONAL dashboards — it answers true for
+  # every role-scoped one, for any actor. On its own it let a holder of the
+  # dashboards permission open a role dashboard they are not a member of and
+  # save it as `scope: "personal"`, which makes the editor its owner: the board
+  # leaves the role and the role's members lose it. Seeing it is the missing
+  # half, exactly as the delete path already spells out.
+  defp editable_by?(dashboard, socket) do
+    viewable_by?(dashboard, socket) and manageable_by?(dashboard, actor_uuid(socket))
+  end
+
   # The scope + scope-specific attrs from the form params. Switching an
   # existing dashboard to "personal" makes the editor its owner (a scope must
   # always point at its audience — the changeset enforces it).
   defp scope_attrs(%{"scope" => "system"}, _socket),
     do: %{scope: "system", owner_user_uuid: nil, role_uuid: nil}
 
-  defp scope_attrs(%{"scope" => "role", "role_uuid" => uuid}, _socket)
-       when is_binary(uuid) and uuid != "",
-       do: %{scope: "role", role_uuid: uuid, owner_user_uuid: nil}
+  # The role picker is hidden unless the dashboard is ALREADY role-scoped, but
+  # the handler still has to check: the value arrives from the wire, and an
+  # unchecked one either publishes the board to a role the sender picked or —
+  # if it names no role at all — creates a row nobody can ever see, since the
+  # changeset only checks that a role uuid is present.
+  defp scope_attrs(%{"scope" => "role", "role_uuid" => uuid}, socket)
+       when is_binary(uuid) and uuid != "" do
+    if Enum.any?(list_roles(), &(&1.uuid == uuid)) do
+      %{scope: "role", role_uuid: uuid, owner_user_uuid: nil}
+    else
+      personal_attrs(socket)
+    end
+  end
 
-  defp scope_attrs(_params, socket),
+  defp scope_attrs(_params, socket), do: personal_attrs(socket)
+
+  defp personal_attrs(socket),
     do: %{scope: "personal", owner_user_uuid: actor_uuid(socket), role_uuid: nil}
 
   # Role-scoped dashboards are HIDDEN for now (they were briefly offered in the

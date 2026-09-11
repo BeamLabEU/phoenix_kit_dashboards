@@ -75,27 +75,23 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   end
 
   def handle_event("place", %{"slot" => slot_key} = params, socket) do
-    case Placements.put(slot_key, params, Helpers.actor_opts(socket)) do
-      {:ok, _placements} ->
-        {:noreply, socket |> assign(error: nil) |> load()}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, :error, error_message(reason))}
-    end
+    with_slot(socket, slot_key, fn ->
+      Placements.put(slot_key, params, Helpers.actor_opts(socket))
+    end)
   end
 
   def handle_event("unplace", %{"slot" => slot_key} = params, socket) do
-    case Placements.delete(slot_key, params, Helpers.actor_opts(socket)) do
-      {:ok, _} -> {:noreply, socket |> assign(error: nil) |> load()}
-      {:error, reason} -> {:noreply, assign(socket, :error, error_message(reason))}
-    end
+    with_slot(socket, slot_key, fn ->
+      Placements.delete(slot_key, params, Helpers.actor_opts(socket))
+    end)
   end
 
   def handle_event("set_priority", %{"slot" => slot_key, "priority" => raw} = params, socket) do
     case Integer.parse(to_string(raw)) do
       {priority, _} ->
-        Placements.set_priority(slot_key, params, priority, Helpers.actor_opts(socket))
-        {:noreply, load(socket)}
+        with_slot(socket, slot_key, fn ->
+          Placements.set_priority(slot_key, params, priority, Helpers.actor_opts(socket))
+        end)
 
       :error ->
         {:noreply, socket}
@@ -127,6 +123,36 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
     Dashboards.list_for_user(Helpers.actor_uuid(socket), Helpers.user_role_uuids(socket)) != []
   rescue
     _ -> false
+  end
+
+  # The slot key arrives from the WIRE — it is a hidden input on the form, so
+  # the rendered list being scope-filtered is display-only. `Placements.resolve/3`
+  # re-checks the slot's own permission on the READ side for exactly this reason
+  # (a viewer must not open another module's slot by typing its address); the
+  # write side has to ask the same question, or a holder of the dashboards
+  # permission could bind, unbind and reorder dashboards in the slots of modules
+  # they hold no permission for, changing what every user of that module sees.
+  defp with_slot(socket, slot_key, fun) do
+    scope = socket.assigns[:phoenix_kit_current_scope]
+
+    case Slots.get(slot_key) do
+      %Slot{} = slot ->
+        if Slots.visible_for_scope?(slot, scope),
+          do: apply_write(socket, fun),
+          else: {:noreply, assign(socket, :error, error_message(:unknown_slot))}
+
+      _ ->
+        {:noreply, assign(socket, :error, error_message(:unknown_slot))}
+    end
+  end
+
+  # Every write reports its outcome. `set_priority` used to discard its result
+  # and reload, so a refused reorder looked like one that silently reverted.
+  defp apply_write(socket, fun) do
+    case fun.() do
+      {:ok, _} -> {:noreply, socket |> assign(error: nil) |> load()}
+      {:error, reason} -> {:noreply, assign(socket, :error, error_message(reason))}
+    end
   end
 
   defp error_message(:personal_not_shareable),
