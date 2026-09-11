@@ -105,6 +105,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
      # Live bind-source choices while the settings modal is open. Cleared with
      # the modal, because they describe an unsaved form, not the dashboard.
      |> assign(:bind_sources, %{})
+     |> assign(:leaf_values, %{})
      |> assign(:places, [])}
   end
 
@@ -502,14 +503,15 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     # Only for a widget that exists — a crafted/stale id must not park a
     # dangling id in the assign (the modal render would crash on nil).
     if settings_instance_data(socket.assigns.dashboard, instance_id) do
-      {:noreply, assign(socket, settings_instance: instance_id, bind_sources: %{})}
+      {:noreply,
+       assign(socket, settings_instance: instance_id, bind_sources: %{}, leaf_values: %{})}
     else
       {:noreply, socket}
     end
   end
 
   defp do_handle_event("close_settings", _params, socket) do
-    {:noreply, assign(socket, settings_instance: nil, bind_sources: %{})}
+    {:noreply, assign(socket, settings_instance: nil, bind_sources: %{}, leaf_values: %{})}
   end
 
   defp do_handle_event("settings_changed", params, socket) do
@@ -609,9 +611,12 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
 
   defp save_settings(socket, instance_id, params) do
     grid? = Dashboard.layout_mode(socket.assigns.dashboard) == "grid"
+    leaf_values = socket.assigns.leaf_values
 
+    # A Leaf field has no form input, so its content is not in `params` — merge
+    # what the editor reported. Form params still win for everything else.
     attrs =
-      %{settings: params["settings"] || %{}}
+      %{settings: Map.merge(params["settings"] || %{}, leaf_values)}
       |> then(&if grid?, do: &1, else: maybe_put_view(&1, params["view"]))
       |> maybe_put_min_override(params["min_override"])
       |> maybe_put_binds(params["binds"])
@@ -634,7 +639,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         socket
       end
 
-    socket = assign(socket, settings_instance: nil, bind_sources: %{})
+    socket = assign(socket, settings_instance: nil, bind_sources: %{}, leaf_values: %{})
 
     case Dashboards.configure_widget(
            socket.assigns.dashboard,
@@ -764,6 +769,20 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   def handle_info({:placements_changed, _slot_key}, socket) do
     {:noreply, assign_places(socket)}
   end
+
+  # Leaf reports to the host process, so the settings modal's rich fields land
+  # here rather than in the form's params. Stash by settings key and merge on
+  # save; a message for anything that is not one of our editors is ignored so
+  # another Leaf on the page cannot write into a widget's settings.
+  def handle_info({:leaf_changed, %{editor_id: editor_id, markdown: markdown}}, socket)
+      when is_binary(markdown) do
+    case settings_leaf_key(editor_id) do
+      nil -> {:noreply, socket}
+      key -> {:noreply, update(socket, :leaf_values, &Map.put(&1, key, markdown))}
+    end
+  end
+
+  def handle_info({:leaf_changed, _payload}, socket), do: {:noreply, socket}
 
   def handle_info(msg, socket) do
     Logger.debug("[Dashboards] Unhandled info: #{inspect(msg)}")

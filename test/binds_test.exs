@@ -198,6 +198,25 @@ defmodule PhoenixKitDashboards.BindsTest do
     end
   end
 
+  describe "the settings rich-editor id contract" do
+    alias PhoenixKitDashboards.Web.BuilderComponents
+
+    test "an id round-trips back to its settings key" do
+      # Leaf reports `{:leaf_changed, %{editor_id: …}}` to the HOST, so the id
+      # is the only link back to which setting was typed into. Rename one side
+      # and the note silently stops saving.
+      id = BuilderComponents.settings_leaf_id("body")
+
+      assert BuilderComponents.settings_leaf_key(id) == "body"
+    end
+
+    test "a foreign editor's id is ignored, not mistaken for a setting" do
+      refute BuilderComponents.settings_leaf_key("post-content-editor")
+      refute BuilderComponents.settings_leaf_key("pk-dash-set-")
+      refute BuilderComponents.settings_leaf_key("")
+    end
+  end
+
   describe "put_bind/3" do
     test "setting then clearing leaves no binds key at all" do
       bound = Binds.put_bind(%{"id" => "w1"}, "test.thing", "slot")

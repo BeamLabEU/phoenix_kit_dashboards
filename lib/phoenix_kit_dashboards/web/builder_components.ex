@@ -14,6 +14,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   use PhoenixKitWeb, :html
   use Gettext, backend: PhoenixKitDashboards.Gettext
 
+  import Leaf, only: [leaf_editor: 1]
   import PhoenixKitDashboards.Web.Helpers, only: [translate_catalog: 1]
 
   alias Phoenix.LiveView.JS
@@ -1163,9 +1164,26 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:bind, :any, default: nil)
   attr(:source, :any, default: nil)
 
+  # Long-form text gets the kit's own rich editor rather than a bare textarea —
+  # it is what every other content surface here uses, and its mode (hybrid /
+  # visual / markdown / html) follows the site-wide Settings → Content Editor
+  # choice instead of being decided per widget.
+  #
+  # Leaf reports content to the HOST process (`{:leaf_changed, …}`), never to a
+  # LiveComponent, so `BuilderLive` collects it and merges it on save — see
+  # `settings_leaf_id/1` for the id contract that ties the two together.
   def settings_field(%{field: %{type: :text}} = assigns) do
     ~H"""
-    <.textarea name={"settings[#{@field.key}]"} label={translate_catalog(@field[:label]) || @field.key} value={@value} />
+    <div class="flex flex-col gap-1">
+      <span class="text-sm font-medium">{translate_catalog(@field[:label]) || @field.key}</span>
+      <.leaf_editor
+        id={settings_leaf_id(@field.key)}
+        content={@value || ""}
+        mode={editor_mode()}
+        height="240px"
+        debounce={400}
+      />
+    </div>
     """
   end
 
@@ -1243,6 +1261,37 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   # stored uuid is a deliberate historical choice — it resolves as a PIN, never
   # silently reinterpreted as "this page's". Reinterpreting saved data is how
   # someone's board quietly starts showing a different project.
+  @doc """
+  The DOM/editor id for a rich settings field.
+
+  Leaf's `{:leaf_changed, %{editor_id: …}}` is how the host learns what was
+  typed, so the id has to be reversible back to the settings key. The modal
+  edits one widget at a time, so the field key alone is unambiguous.
+  """
+  @spec settings_leaf_id(String.t()) :: String.t()
+  def settings_leaf_id(field_key), do: "pk-dash-set-" <> field_key
+
+  @doc "The settings key behind a `settings_leaf_id/1`, or `nil`."
+  @spec settings_leaf_key(String.t()) :: String.t() | nil
+  def settings_leaf_key("pk-dash-set-" <> field_key) when field_key != "", do: field_key
+  def settings_leaf_key(_other), do: nil
+
+  # Site-wide editor mode. Leaf's mode clauses have no catch-all, so anything
+  # unrecognised must be normalised here rather than blowing up inside Leaf —
+  # and `get_editor_mode/0` only exists on newer core builds.
+  defp editor_mode do
+    if function_exported?(PhoenixKit.Settings, :get_editor_mode, 0) do
+      normalize_mode(PhoenixKit.Settings.get_editor_mode())
+    else
+      :hybrid
+    end
+  rescue
+    _ -> :hybrid
+  end
+
+  defp normalize_mode(mode) when mode in [:visual, :hybrid, :markdown, :html], do: mode
+  defp normalize_mode(_mode), do: :hybrid
+
   defp bind_source(nil), do: "pin"
   defp bind_source("slot"), do: "slot"
   defp bind_source("viewer"), do: "viewer"
