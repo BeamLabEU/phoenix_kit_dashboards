@@ -200,10 +200,16 @@ defmodule PhoenixKitDashboards.Placements do
     |> placed_from()
   end
 
+  # Re-check the SHARE rule at render, not only when the placement was made.
+  # `put/3` refuses a non-system dashboard, but a dashboard can be re-scoped
+  # afterwards by an edit that never touches the placement — and the board went
+  # on rendering to everyone, which is a private canvas published to the
+  # company. `Web.ProjectDashboardLive` has always re-checked this on its own
+  # pane; the placement path has to as well.
   defp load_all(placements) do
     placements
     |> Enum.map(&Dashboards.get(&1["dashboard_uuid"]))
-    |> Enum.reject(&is_nil/1)
+    |> Enum.filter(&match?(%Dashboard{scope: "system"}, &1))
   end
 
   # `nil` means "this tier declares nothing here" — fall through to the next.
@@ -476,11 +482,20 @@ defmodule PhoenixKitDashboards.Placements do
     cond do
       is_nil(slot) -> :slot_gone
       not is_nil(scope) and not Slots.visible_for_scope?(slot, scope) -> :slot_unavailable
-      is_nil(Dashboards.get(placement["dashboard_uuid"])) -> :dashboard_gone
-      true -> nil
+      true -> dashboard_problem(placement["dashboard_uuid"])
     end
   rescue
     _ -> nil
+  end
+
+  # A place that renders nothing needs to say WHICH way it broke: the board was
+  # deleted, or it is still there but no longer shared.
+  defp dashboard_problem(uuid) do
+    case Dashboards.get(uuid) do
+      nil -> :dashboard_gone
+      %Dashboard{scope: "system"} -> nil
+      %Dashboard{} -> :dashboard_not_shared
+    end
   end
 
   # ── Validation ─────────────────────────────────────────────────────

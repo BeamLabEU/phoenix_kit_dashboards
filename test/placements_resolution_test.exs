@@ -148,6 +148,59 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
     end
   end
 
+  describe "a placed dashboard that stops being shared" do
+    test "stops rendering for everyone" do
+      # `put/3` refuses a non-system dashboard, but nothing re-checked
+      # afterwards: bind a shared dashboard, then edit it to Personal, and it
+      # kept rendering on everyone's admin home — a private board published to
+      # the company by an edit that never touched the placement.
+      # `ProjectDashboardLive` has always re-checked this; the placement path
+      # did not.
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Company home",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      {:ok, _} =
+        Placements.put("core.admin_home", %{
+          "audience" => "everyone",
+          "dashboard_uuid" => dashboard.uuid
+        })
+
+      assert {:everyone, [_shown]} = Placements.resolve("core.admin_home", nil)
+
+      {:ok, _private} =
+        PhoenixKitDashboards.Dashboards.update(dashboard, %{scope: "personal"})
+
+      assert {:everyone, []} = Placements.resolve("core.admin_home", nil)
+    end
+
+    test "health/1 explains why the place went blank" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Company home",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      {:ok, _} =
+        Placements.put("core.admin_home", %{
+          "audience" => "everyone",
+          "dashboard_uuid" => dashboard.uuid
+        })
+
+      {:ok, _} = PhoenixKitDashboards.Dashboards.update(dashboard, %{scope: "personal"})
+
+      assert [%{problem: :dashboard_not_shared}] = Placements.health()
+    end
+  end
+
   describe "slot tab visibility" do
     test "a place with nothing in it shows no tab, even to an administrator" do
       # An empty place is navigation nobody asked for. Being able to MANAGE

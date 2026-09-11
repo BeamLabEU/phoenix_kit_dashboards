@@ -424,6 +424,12 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   defp problem_text(%{slot_key: slot_key, problem: :dashboard_gone}),
     do: gettext("%{place}: the dashboard it showed was deleted.", place: slot_key)
 
+  defp problem_text(%{slot_key: slot_key, problem: :dashboard_not_shared}),
+    do:
+      gettext("%{place}: its dashboard is no longer shared, so nothing is shown.",
+        place: slot_key
+      )
+
   defp problem_text(%{slot_key: slot_key, problem: :slot_gone}),
     do: gettext("%{place}: this place no longer exists.", place: slot_key)
 

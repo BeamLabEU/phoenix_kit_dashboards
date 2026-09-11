@@ -20,7 +20,9 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Slot
 
   @impl true
   def mount(_params, _session, socket) do
@@ -34,6 +36,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
         {:noreply,
          socket
          |> assign(:dashboard, nil)
+         |> assign(:placed_in, [])
          |> assign(:page_title, gettext("New dashboard"))}
 
       :edit ->
@@ -47,6 +50,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
       {:noreply,
        socket
        |> assign(:dashboard, dashboard)
+       |> assign(:placed_in, placed_in(dashboard))
        |> assign(
          :page_title,
          gettext("Dashboard settings")
@@ -169,6 +173,22 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   # saving can't silently convert it to personal.
   defp role_scope_visible?(dashboard), do: match?(%{scope: "role"}, dashboard)
 
+  # The places this dashboard currently fills, named the way the viewer sees
+  # them — so "making it personal" states its actual consequence rather than
+  # leaving it to be discovered when a page goes blank.
+  defp placed_in(%Dashboard{uuid: uuid}) do
+    uuid
+    |> Placements.places_for()
+    |> Enum.reject(&(&1.audience == "personal"))
+    |> Enum.map(fn
+      %{slot: %Slot{} = slot} -> Slot.localized_name(slot)
+      %{slot_key: key} -> key
+    end)
+    |> Enum.uniq()
+  rescue
+    _ -> []
+  end
+
   defp blank_to_default(nil, default), do: default
   defp blank_to_default("", default), do: default
   defp blank_to_default(value, _default), do: value
@@ -246,6 +266,19 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
               }
             />
 
+            <%!-- Visibility is not just who can open it: only a SHARED dashboard
+            may be placed. Someone who picks Personal and then cannot find their
+            board in Places has been told nothing — so say it here. --%>
+            <p class="-mt-1 text-xs text-base-content/60">
+              {gettext("Only shared dashboards can be shown in a place. A personal one is yours alone.")}
+            </p>
+
+            <div :if={@placed_in != []} class="alert alert-warning py-2 text-sm">
+              {gettext("This dashboard is shown in %{places}. Making it personal removes it from there.",
+                places: Enum.join(@placed_in, ", ")
+              )}
+            </div>
+
             <.select
               :if={role_scope_visible?(@dashboard)}
               name="role_uuid"
@@ -255,19 +288,15 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
             />
 
             <div class="flex justify-end gap-2 pt-2">
-              <.link navigate={Paths.index()} class="btn btn-ghost">
+              <.button variant="ghost" navigate={Paths.index()}>
                 {gettext("Cancel")}
-              </.link>
-              <button
-                type="submit"
-                phx-disable-with={gettext("Saving…")}
-                class="btn btn-primary"
-              >
+              </.button>
+              <.button type="submit" phx-disable-with={gettext("Saving…")}>
                 <.icon :if={is_nil(@dashboard)} name="hero-plus" class="w-4 h-4" />
                 {if @dashboard,
                   do: gettext("Save"),
                   else: gettext("Create")}
-              </button>
+              </.button>
             </div>
           </form>
         </div>
