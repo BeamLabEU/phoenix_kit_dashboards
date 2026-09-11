@@ -84,7 +84,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         :if={@can_fork?}
         type="button"
         phx-click="fork_personal"
-        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        class="btn btn-outline btn-sm shrink-0 gap-1"
         title={gettext("Copy this and make the copy your own version")}
       >
         <.icon name="hero-user" class="h-4 w-4" />
@@ -94,7 +94,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         :if={@mine?}
         type="button"
         phx-click="reset_personal"
-        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        class="btn btn-outline btn-sm shrink-0 gap-1"
         title={gettext("Stop using your own version here")}
       >
         <.icon name="hero-arrow-uturn-left" class="h-4 w-4" />
@@ -109,7 +109,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
       <.link
         :if={Helpers.can_manage_places?(@scope)}
         navigate={Paths.places()}
-        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        class="btn btn-outline btn-sm shrink-0 gap-1"
         title={gettext("Choose which dashboard is shown here")}
       >
         <.icon name="hero-arrows-right-left" class="h-4 w-4" />
@@ -118,7 +118,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
       <.link
         :if={Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
         navigate={Paths.builder(@active.uuid)}
-        class="btn btn-ghost btn-sm shrink-0 gap-1"
+        class="btn btn-outline btn-sm shrink-0 gap-1"
       >
         <.icon name="hero-pencil-square" class="h-4 w-4" />
         {gettext("Edit layout")}
@@ -132,7 +132,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
 
   def slot_empty(assigns) do
     ~H"""
-    <div class="card border border-dashed border-base-300 bg-base-100">
+    <div class="card bg-base-100 shadow border-2 border-dashed border-base-300">
       <div class="card-body items-center gap-2 py-10 text-center">
         <.icon name="hero-squares-2x2" class="h-8 w-8 opacity-40" />
         <p class="text-sm opacity-70">

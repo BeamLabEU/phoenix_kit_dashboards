@@ -182,7 +182,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
             class="input input-sm input-bordered w-56"
           />
         </form>
-        <.link navigate={Paths.index()} class="btn btn-ghost btn-sm">
+        <.link navigate={Paths.index()} class="btn btn-outline btn-sm">
           {gettext("All dashboards")}
         </.link>
       </div>
@@ -196,7 +196,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         </span>
       </div>
 
-      <div :if={@groups == []} class="card border border-dashed border-base-300 bg-base-100">
+      <div :if={@groups == []} class="card bg-base-100 shadow border-2 border-dashed border-base-300">
         <div class="card-body items-center gap-1 py-10 text-center">
           <.icon name="hero-rectangle-group" class="h-8 w-8 opacity-40" />
           <p class="text-sm opacity-70">
@@ -231,7 +231,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
 
   defp place_card(assigns) do
     ~H"""
-    <div class="card border border-base-200 bg-base-100">
+    <div class="card bg-base-100 shadow">
       <div class="card-body gap-3 p-4">
         <div class="flex flex-wrap items-center gap-2">
           <.icon name={@slot.icon} class="h-5 w-5 opacity-70" />
@@ -254,7 +254,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
           <span :if={@slot.provides != []} class="badge badge-ghost badge-sm">
             {subject_badge(@slot)}
           </span>
-          <button type="button" phx-click={if @open, do: "close", else: "open"} phx-value-slot={@slot.key} class="btn btn-ghost btn-sm">
+          <button type="button" phx-click={if @open, do: "close", else: "open"} phx-value-slot={@slot.key} class="btn btn-outline btn-sm">
             {if @open, do: gettext("Done"), else: gettext("Change")}
           </button>
         </div>
@@ -288,7 +288,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
               phx-value-audience={row.audience}
               phx-value-role_uuid={row.role_uuid}
               phx-value-dashboard_uuid={row.dashboard_uuid}
-              class="btn btn-ghost btn-xs text-error"
+              class="btn btn-outline btn-xs text-error"
             >
               {gettext("Remove")}
             </button>
