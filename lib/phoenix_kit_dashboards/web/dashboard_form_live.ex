@@ -195,7 +195,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
         </h1>
       </div>
 
-      <div class="card bg-base-100 shadow">
+      <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
           <form id="dashboard-form" phx-submit="save" class="flex flex-col gap-4">
             <.input

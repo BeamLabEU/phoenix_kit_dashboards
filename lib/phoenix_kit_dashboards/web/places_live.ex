@@ -168,24 +168,22 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
     <h1>: the admin header breadcrumb already shows @page_title, so the page
     reclaims the space (workspace canon — see DashboardsLive). --%>
     <div class="flex flex-col mx-auto max-w-5xl px-4 py-6 gap-6">
-      <div class="flex flex-wrap items-center gap-3">
-        <p class="text-sm opacity-70">
-          {gettext("Choose which dashboard appears where, and who sees it.")}
-        </p>
-        <div class="grow"></div>
-        <form phx-change="search" phx-submit="search">
-          <input
-            type="search"
-            name="query"
-            value={@query}
-            placeholder={gettext("Search places")}
-            class="input input-sm input-bordered w-56"
-          />
-        </form>
-        <.link navigate={Paths.index()} class="btn btn-outline btn-sm">
-          {gettext("All dashboards")}
-        </.link>
-      </div>
+      <.admin_page_header subtitle={gettext("Choose which dashboard appears where, and who sees it.")}>
+        <:actions>
+          <form phx-change="search" phx-submit="search">
+            <.input
+              type="search"
+              name="query"
+              value={@query}
+              placeholder={gettext("Search places")}
+              class="input-sm w-56"
+            />
+          </form>
+          <.button variant="outline" size="sm" navigate={Paths.index()}>
+            {gettext("All dashboards")}
+          </.button>
+        </:actions>
+      </.admin_page_header>
 
       <div :if={@error} class="alert alert-error py-2 text-sm">{@error}</div>
 
@@ -196,7 +194,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         </span>
       </div>
 
-      <div :if={@groups == []} class="card bg-base-100 shadow border-2 border-dashed border-base-300">
+      <div :if={@groups == []} class="card bg-base-100 shadow-xl border-2 border-dashed border-base-300">
         <div class="card-body items-center gap-1 py-10 text-center">
           <.icon name="hero-rectangle-group" class="h-8 w-8 opacity-40" />
           <p class="text-sm opacity-70">
@@ -231,7 +229,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
 
   defp place_card(assigns) do
     ~H"""
-    <div class="card bg-base-100 shadow">
+    <div class="card bg-base-100 shadow-xl">
       <div class="card-body gap-3 p-4">
         <div class="flex flex-wrap items-center gap-2">
           <.icon name={@slot.icon} class="h-5 w-5 opacity-70" />
@@ -254,9 +252,14 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
           <span :if={@slot.provides != []} class="badge badge-ghost badge-sm">
             {subject_badge(@slot)}
           </span>
-          <button type="button" phx-click={if @open, do: "close", else: "open"} phx-value-slot={@slot.key} class="btn btn-outline btn-sm">
+          <.button
+            variant="outline"
+            size="sm"
+            phx-click={if @open, do: "close", else: "open"}
+            phx-value-slot={@slot.key}
+          >
             {if @open, do: gettext("Done"), else: gettext("Change")}
-          </button>
+          </.button>
         </div>
 
         <%!-- The company-wide answer first, then role exceptions: the order
@@ -280,18 +283,18 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
               {gettext("priority")} {row.priority}
             </span>
             <div class="grow"></div>
-            <button
+            <.button
               :if={@open}
-              type="button"
+              variant="error"
+              size="xs"
               phx-click="unplace"
               phx-value-slot={@slot.key}
               phx-value-audience={row.audience}
               phx-value-role_uuid={row.role_uuid}
               phx-value-dashboard_uuid={row.dashboard_uuid}
-              class="btn btn-outline btn-xs text-error"
             >
               {gettext("Remove")}
-            </button>
+            </.button>
           </li>
         </ul>
 
@@ -333,7 +336,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
             </select>
           </label>
 
-          <button type="submit" class="btn btn-primary btn-sm">{gettext("Show it here")}</button>
+          <.button type="submit" size="sm">{gettext("Show it here")}</.button>
         </form>
 
         <p :if={@open and @slot.provides != []} class="text-xs opacity-60">

@@ -45,20 +45,18 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         aria-label={gettext("Dashboards")}
         class="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden"
       >
-        <button
+        <.button
           :for={{dashboard, index} <- Enum.with_index(@dashboards)}
-          type="button"
+          variant={if index == @active_index, do: "primary", else: "ghost"}
+          size="sm"
           role="tab"
           aria-selected={to_string(index == @active_index)}
           phx-click="select_dashboard"
           phx-value-index={index}
-          class={[
-            "btn btn-sm max-w-48 shrink-0",
-            if(index == @active_index, do: "btn-primary", else: "btn-ghost")
-          ]}
+          class="max-w-48 shrink-0"
         >
           <span class="truncate">{dashboard.title}</span>
-        </button>
+        </.button>
       </div>
 
       <.link
@@ -80,49 +78,55 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
       <%!-- The per-person tier. Copying leaves the shared board untouched and
       still visible to everyone else; resetting UNPLACES the copy rather than
       deleting it, so an afternoon of arranging widgets survives the click. --%>
-      <button
+      <.button
         :if={@can_fork?}
-        type="button"
+        variant="outline"
+        size="sm"
         phx-click="fork_personal"
-        class="btn btn-outline btn-sm shrink-0 gap-1"
+        class="shrink-0 gap-1"
         title={gettext("Copy this and make the copy your own version")}
       >
         <.icon name="hero-user" class="h-4 w-4" />
         {gettext("Make it mine")}
-      </button>
-      <button
+      </.button>
+      <.button
         :if={@mine?}
-        type="button"
+        variant="outline"
+        size="sm"
         phx-click="reset_personal"
-        class="btn btn-outline btn-sm shrink-0 gap-1"
+        class="shrink-0 gap-1"
         title={gettext("Stop using your own version here")}
       >
         <.icon name="hero-arrow-uturn-left" class="h-4 w-4" />
         {gettext("Use the shared one")}
-      </button>
+      </.button>
 
       <%!-- TWO different jobs, and conflating them is why this page felt like
       a dead end: "Edit layout" changes what is ON this dashboard, "Change"
       changes WHICH dashboard is shown here. Without the second, a place could
       only ever be filled once — the picker lived in the empty state and
       vanished the moment it was used. --%>
-      <.link
+      <.button
         :if={Helpers.can_manage_places?(@scope)}
+        variant="outline"
+        size="sm"
         navigate={Paths.places()}
-        class="btn btn-outline btn-sm shrink-0 gap-1"
+        class="shrink-0 gap-1"
         title={gettext("Choose which dashboard is shown here")}
       >
         <.icon name="hero-arrows-right-left" class="h-4 w-4" />
         {gettext("Change")}
-      </.link>
-      <.link
+      </.button>
+      <.button
         :if={Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
+        variant="outline"
+        size="sm"
         navigate={Paths.builder(@active.uuid)}
-        class="btn btn-outline btn-sm shrink-0 gap-1"
+        class="shrink-0 gap-1"
       >
         <.icon name="hero-pencil-square" class="h-4 w-4" />
         {gettext("Edit layout")}
-      </.link>
+      </.button>
     </div>
     """
   end
@@ -132,15 +136,15 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
 
   def slot_empty(assigns) do
     ~H"""
-    <div class="card bg-base-100 shadow border-2 border-dashed border-base-300">
+    <div class="card bg-base-100 shadow-xl border-2 border-dashed border-base-300">
       <div class="card-body items-center gap-2 py-10 text-center">
         <.icon name="hero-squares-2x2" class="h-8 w-8 opacity-40" />
         <p class="text-sm opacity-70">
           {gettext("No dashboard is shown here yet.")}
         </p>
-        <.link :if={@slot} navigate={Paths.places()} class="btn btn-sm btn-primary">
+        <.button :if={@slot} size="sm" navigate={Paths.places()}>
           {gettext("Choose a dashboard")}
-        </.link>
+        </.button>
       </div>
     </div>
     """

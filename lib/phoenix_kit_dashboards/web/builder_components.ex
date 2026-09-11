@@ -174,7 +174,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         >
           <.icon name="hero-cog-6-tooth" class="w-4 h-4" />
         </button>
-        <div tabindex="0" class="dropdown-content z-30 w-64 rounded-box bg-base-100 p-2 shadow">
+        <div tabindex="0" class="dropdown-content z-30 w-64 rounded-box bg-base-100 p-2 shadow-lg">
           <ul class="menu p-0">
             <li>
               <button type="button" phx-click="start_rename_layout" phx-value-id={@active_layout}>
