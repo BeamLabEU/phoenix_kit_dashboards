@@ -22,7 +22,9 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
 
   import PhoenixKitDashboards.Web.BuilderComponents, only: [grid_mode: 1, free_mode: 1]
 
+  alias PhoenixKitDashboards.Layouts
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Slot
   alias PhoenixKitDashboards.Web.Helpers
 
@@ -34,8 +36,15 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
   attr(:scope, :any, default: nil)
   attr(:can_fork?, :boolean, default: false)
   attr(:mine?, :boolean, default: false)
+  attr(:id_prefix, :string, default: "")
+  attr(:active_layout, :any, default: nil)
 
   def slot_header(assigns) do
+    assigns =
+      assigns
+      |> assign(:layouts, Layouts.layouts(assigns.active))
+      |> assign(:mode, Dashboard.layout_mode(assigns.active))
+
     ~H"""
     <div class="flex flex-wrap items-center gap-2">
       <%!-- Several dashboards in one slot: THIS is the page's only tab strip. --%>
@@ -74,6 +83,37 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
       <span :if={tier_label(@tier)} class="badge badge-ghost badge-sm shrink-0">
         {tier_label(@tier)}
       </span>
+
+      <%!-- A named layout is chosen with a compact select, never a second tab
+      strip: the strip above already means "which dashboard", and two rows of
+      tabs meaning different things is the collision this design exists to
+      avoid. Hidden entirely when there is only one layout. --%>
+      <form
+        :if={length(@layouts) > 1}
+        id={"#{@id_prefix}layout-form"}
+        phx-change="select_layout"
+        class="shrink-0"
+      >
+        <select name="layout" class="select select-sm select-bordered" aria-label={gettext("Layout")}>
+          <option :for={entry <- @layouts} value={entry["id"]} selected={entry["id"] == @active_layout}>
+            {entry["name"]}
+          </option>
+        </select>
+      </form>
+
+      <%!-- A placed board is the one most likely to be put on a wall, so it
+      needs fullscreen at least as much as the builder does. Targets THIS
+      surface's fit container — the ids are prefixed per surface. --%>
+      <button
+        id={"#{@id_prefix}fullscreen-btn"}
+        phx-hook="DashboardFullscreen"
+        data-target={"#{@id_prefix}dashboard-#{if @mode == "free", do: "free", else: "grid"}-fit"}
+        type="button"
+        class="btn btn-ghost btn-sm btn-square shrink-0"
+        title={gettext("Full screen")}
+      >
+        <.icon name="hero-arrows-pointing-out" class="h-4 w-4" />
+      </button>
 
       <%!-- The per-person tier. Copying leaves the shared board untouched and
       still visible to everyone else; resetting UNPLACES the copy rather than

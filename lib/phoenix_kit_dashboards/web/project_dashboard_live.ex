@@ -87,14 +87,16 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
     # design_h refresh too — the render branches on them (final panel
     # find: a stale mode rendered the wrong board component after a
     # remote grid↔pixel change).
+    layout = Layouts.keep_layout_id(dashboard, socket.assigns[:active_layout])
+
     {:noreply,
      socket
      |> assign(
        dashboard: dashboard,
        state: state_for(dashboard),
        mode: Dashboard.layout_mode(dashboard),
-       active_layout: first_layout_id(dashboard),
-       design_h: design_height(dashboard)
+       active_layout: layout,
+       design_h: design_height(dashboard, layout)
      )
      |> maybe_schedule_refresh()}
   end
@@ -163,6 +165,15 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
     {:noreply, socket}
   end
 
+  # View state only — a project viewer may look at every layout of the linked
+  # board without holding any right to change it.
+  def handle_event("select_layout", %{"layout" => id}, socket) do
+    dashboard = socket.assigns[:dashboard]
+    layout = Layouts.keep_layout_id(dashboard, id)
+
+    {:noreply, assign(socket, active_layout: layout, design_h: design_height(dashboard, layout))}
+  end
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   # ── Render ────────────────────────────────────────────────────────
@@ -176,6 +187,36 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
         <div class="min-w-0 grow">
           <h3 class="font-semibold">{@dashboard.title}</h3>
         </div>
+        <form
+          :if={length(Layouts.layouts(@dashboard)) > 1}
+          id={"#{@id_prefix}layout-form"}
+          phx-change="select_layout"
+          class="shrink-0"
+        >
+          <select
+            name="layout"
+            class="select select-sm select-bordered"
+            aria-label={gettext("Layout")}
+          >
+            <option
+              :for={entry <- Layouts.layouts(@dashboard)}
+              value={entry["id"]}
+              selected={entry["id"] == @active_layout}
+            >
+              {entry["name"]}
+            </option>
+          </select>
+        </form>
+        <button
+          id={"#{@id_prefix}fullscreen-btn"}
+          phx-hook="DashboardFullscreen"
+          data-target={"#{@id_prefix}dashboard-#{if @mode == "free", do: "free", else: "grid"}-fit"}
+          type="button"
+          class="btn btn-ghost btn-sm btn-square shrink-0"
+          title={gettext("Full screen")}
+        >
+          <span class="hero-arrows-pointing-out h-4 w-4"></span>
+        </button>
         <.link navigate={Paths.builder(@dashboard.uuid)} class="btn btn-ghost btn-sm gap-1">
           {gettext("Open in Dashboards")}
         </.link>
@@ -282,34 +323,27 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
         true -> state_for(dashboard)
       end
 
+    layout = Layouts.keep_layout_id(dashboard, socket.assigns[:active_layout])
+
     assign(socket,
       dashboard: dashboard,
       state: state,
       mode: dashboard && Dashboard.layout_mode(dashboard),
-      active_layout: first_layout_id(dashboard),
-      design_h: design_height(dashboard)
+      active_layout: layout,
+      design_h: design_height(dashboard, layout)
     )
   end
 
   defp state_for(%Dashboard{scope: "system"}), do: :ok
   defp state_for(%Dashboard{}), do: :not_shared
 
-  defp first_layout_id(%Dashboard{} = dashboard) do
-    case Layouts.layouts(dashboard) do
-      [%{"id" => id} | _] -> id
-      _ -> nil
-    end
-  end
-
-  defp first_layout_id(_), do: nil
-
-  defp design_height(%Dashboard{} = dashboard) do
-    Dashboards.design_height(dashboard, first_layout_id(dashboard))
+  defp design_height(%Dashboard{} = dashboard, layout) do
+    Dashboards.design_height(dashboard, layout)
   rescue
     _ -> 900
   end
 
-  defp design_height(_), do: 900
+  defp design_height(_dashboard, _layout), do: 900
 
   # ── Refresh helpers (builder semantics) ───────────────────────────
 

@@ -87,6 +87,15 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
      |> Refresh.reschedule()}
   end
 
+  # Switching layout is view state only — nothing is written, so a viewer with
+  # no edit rights can still look at the other layouts of a placed board.
+  def handle_event("select_layout", %{"layout" => id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:active_layout, Layouts.keep_layout_id(socket.assigns[:active], id))
+     |> assign_design_h()}
+  end
+
   def handle_event("fork_personal", _params, socket) do
     {:noreply, Personal.fork(socket, &load_slot/1)}
   end
@@ -98,6 +107,14 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
   def handle_event("refresh_pause", _params, socket), do: {:noreply, Refresh.pause(socket)}
   def handle_event("refresh_resume", _params, socket), do: {:noreply, Refresh.resume(socket)}
   def handle_event(_event, _params, socket), do: {:noreply, socket}
+
+  defp assign_design_h(socket) do
+    assign(
+      socket,
+      :design_h,
+      design_height(socket.assigns[:active], socket.assigns[:active_layout])
+    )
+  end
 
   # ── Loading ────────────────────────────────────────────────────────
 
@@ -163,12 +180,13 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
 
   defp assign_active(socket) do
     active = Enum.at(socket.assigns.dashboards, socket.assigns.active_index)
+    layout = Layouts.keep_layout_id(active, socket.assigns[:active_layout])
 
     assign(socket,
       active: active,
       mode: active && Dashboard.layout_mode(active),
-      active_layout: first_layout_id(active),
-      design_h: design_height(active)
+      active_layout: layout,
+      design_h: design_height(active, layout)
     )
   end
 
@@ -195,22 +213,13 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
     end)
   end
 
-  defp first_layout_id(%Dashboard{} = dashboard) do
-    case Layouts.layouts(dashboard) do
-      [%{"id" => id} | _] -> id
-      _ -> nil
-    end
-  end
-
-  defp first_layout_id(_), do: nil
-
-  defp design_height(%Dashboard{} = dashboard) do
-    Dashboards.design_height(dashboard, first_layout_id(dashboard))
+  defp design_height(%Dashboard{} = dashboard, layout) do
+    Dashboards.design_height(dashboard, layout)
   rescue
     _ -> 900
   end
 
-  defp design_height(_), do: 900
+  defp design_height(_dashboard, _layout), do: 900
 
   defp to_index(value, count) when is_binary(value) do
     case Integer.parse(value) do
@@ -241,6 +250,8 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
         scope={@phoenix_kit_current_scope}
         can_fork?={@can_fork?}
         mine?={@mine?}
+        id_prefix={@id_prefix}
+        active_layout={@active_layout}
       />
 
       <.slot_empty

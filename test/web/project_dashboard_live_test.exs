@@ -110,6 +110,66 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLiveTest do
     end
   end
 
+  describe "viewer controls" do
+    setup do
+      {:ok, dashboard} = Dashboards.create(%{title: "Ops Board", scope: "system"})
+      {:ok, dashboard} = Dashboards.add_widget(dashboard, "core.note")
+      {:ok, dashboard: dashboard, viewer: user_fixture()}
+    end
+
+    test "a placed board offers fullscreen, targeting ITS OWN fit container",
+         %{conn: conn, dashboard: dashboard, viewer: viewer} do
+      {:ok, _view, html} = mount_tab(conn, %{"dashboard_uuid" => dashboard.uuid}, user: viewer)
+
+      assert html =~ ~s(phx-hook="DashboardFullscreen")
+      # The prefix is what keeps two boards on one page from stealing each
+      # other's fullscreen target.
+      assert html =~ ~s(data-target="pk-projtab-dashboard-grid-fit")
+      assert html =~ ~s(id="pk-projtab-fullscreen-btn")
+    end
+
+    test "one layout means no layout picker",
+         %{conn: conn, dashboard: dashboard, viewer: viewer} do
+      {:ok, _view, html} = mount_tab(conn, %{"dashboard_uuid" => dashboard.uuid}, user: viewer)
+
+      refute html =~ "select_layout"
+    end
+
+    test "several layouts are switchable, and the choice survives a live update",
+         %{conn: conn, dashboard: dashboard, viewer: viewer} do
+      {:ok, dashboard, %{"id" => second}} = Dashboards.add_layout(dashboard, "l1")
+
+      {:ok, view, html} = mount_tab(conn, %{"dashboard_uuid" => dashboard.uuid}, user: viewer)
+      assert html =~ "select_layout"
+
+      view
+      |> element("form[phx-change=select_layout]")
+      |> render_change(%{"layout" => second})
+
+      assert render(view) =~ ~s(value="#{second}" selected)
+
+      # A broadcast re-renders the whole board; it must not yank the viewer
+      # back to Layout 1.
+      {:ok, _} = Dashboards.update(dashboard, %{title: "Ops Board v2"})
+
+      html = render(view)
+      assert html =~ "Ops Board v2"
+      assert html =~ ~s(value="#{second}" selected)
+    end
+
+    test "an unknown layout id falls back instead of blanking the board",
+         %{conn: conn, dashboard: dashboard, viewer: viewer} do
+      {:ok, dashboard, _entry} = Dashboards.add_layout(dashboard, "l1")
+      {:ok, view, _html} = mount_tab(conn, %{"dashboard_uuid" => dashboard.uuid}, user: viewer)
+
+      view
+      |> element("form[phx-change=select_layout]")
+      |> render_change(%{"layout" => "nope"})
+
+      assert render(view) =~ ~s(value="l1" selected)
+    end
+  end
+
   describe "the provider contract" do
     test "descriptor shape the projects hub consumes" do
       assert [ext] = PhoenixKitDashboards.phoenix_kit_project_extensions()
