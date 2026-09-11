@@ -14,9 +14,11 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   use PhoenixKitWeb, :html
   use Gettext, backend: PhoenixKitDashboards.Gettext
 
+  import Leaf, only: [leaf_editor: 1]
   import PhoenixKitDashboards.Web.Helpers, only: [translate_catalog: 1]
 
   alias Phoenix.LiveView.JS
+  alias PhoenixKitDashboards.Binds
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Lattice
   alias PhoenixKitDashboards.Layout
@@ -38,6 +40,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:active_layout, :string, required: true)
   attr(:renaming_layout, :string, default: nil)
   attr(:show_grid_lines, :boolean, required: true)
+  attr(:context, :map, default: %{})
 
   def grid(assigns) do
     assigns = assign(assigns, :mode, Dashboard.layout_mode(assigns.dashboard))
@@ -74,8 +77,14 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
           active_layout={@active_layout}
           show_grid_lines={@show_grid_lines}
           empty={@dashboard.layout == []}
+          context={@context}
         />
-        <.free_mode :if={@dashboard.layout != [] and @mode == "free"} dashboard={@dashboard} scope={@scope} />
+        <.free_mode
+          :if={@dashboard.layout != [] and @mode == "free"}
+          dashboard={@dashboard}
+          scope={@scope}
+          context={@context}
+        />
       </div>
     </div>
     """
@@ -153,7 +162,10 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       <%!-- Settings for the ACTIVE layout: rename/delete plus its grid size
       and the Fit-screen action — dimension controls live here, out of the
       bar (they're a deliberate per-layout setting, not a view control). --%>
-      <div class="dropdown dropdown-end shrink-0">
+      <%!-- START-aligned, not end: this gear sits at the LEFT of the bar, just
+      after the layout tabs, so an end-aligned panel extends its full width
+      leftward — off the pane and under the admin sidebar. --%>
+      <div class="dropdown shrink-0">
         <button
           type="button"
           tabindex="0"
@@ -163,7 +175,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         >
           <.icon name="hero-cog-6-tooth" class="w-4 h-4" />
         </button>
-        <div tabindex="0" class="dropdown-content z-30 w-64 rounded-box bg-base-100 p-2 shadow">
+        <div tabindex="0" class="dropdown-content z-30 w-64 rounded-box bg-base-100 p-2 shadow-lg">
           <ul class="menu p-0">
             <li>
               <button type="button" phx-click="start_rename_layout" phx-value-id={@active_layout}>
@@ -261,6 +273,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   # fit/drag DOM ids unique when the board renders inside another page.
   attr(:readonly, :boolean, default: false)
   attr(:id_prefix, :string, default: "")
+  attr(:context, :map, default: %{})
 
   def grid_mode(assigns) do
     entry =
@@ -346,6 +359,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
                 cols={@cols}
                 readonly={@readonly}
                 id_prefix={@id_prefix}
+                context={@context}
               />
             </div>
           </div>
@@ -389,6 +403,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:scope, :any, required: true)
   attr(:readonly, :boolean, default: false)
   attr(:id_prefix, :string, default: "")
+  attr(:context, :map, default: %{})
 
   def free_mode(assigns) do
     {cw, ch} = free_canvas_dims(assigns.dashboard.layout)
@@ -435,6 +450,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
             mode="free"
             readonly={@readonly}
             id_prefix={@id_prefix}
+            context={@context}
           />
         </div>
       </div>
@@ -452,6 +468,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:cols, :integer, default: nil)
   attr(:readonly, :boolean, default: false)
   attr(:id_prefix, :string, default: "")
+  attr(:context, :map, default: %{})
 
   def widget_card(assigns) do
     widget = Registry.get(assigns.inst["widget_key"])
@@ -490,8 +507,9 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
     >
       <%!-- The WHOLE top bar is the drag handle (the drag hooks ignore
       pointer-downs on the buttons inside it); the grip icon is just the visual
-      affordance. Readonly (the project-tab viewer) drops the bar entirely —
-      widgets render frameless, just their bodies. --%>
+      affordance. Readonly (the project-tab viewer and the placed surfaces)
+      drops the bar and the resize grip; the card itself keeps its border,
+      shadow and background, so only the chrome goes, not the frame. --%>
       <div
         :if={not @readonly}
         class={[
@@ -569,7 +587,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         # its box; only pixel-canvas cards keep scroll as the escape hatch.
         if(@mode == "grid", do: "overflow-hidden", else: "overflow-auto")
       ]}>
-        <.widget_body inst={@inst} scope={@scope} placement={@placement} />
+        <.widget_body inst={@inst} scope={@scope} placement={@placement} context={@context} />
       </div>
       <span
         :if={not @readonly}
@@ -709,6 +727,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:inst, :map, required: true)
   attr(:scope, :any, required: true)
   attr(:placement, :map, default: nil)
+  attr(:context, :map, default: %{})
 
   def widget_body(assigns) do
     # PIXEL mode has no grid placement — derive cells from the real px box so
@@ -716,10 +735,17 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
     placement = assigns.placement || pixel_cells(assigns.inst)
     widget = Registry.get(assigns.inst["widget_key"])
 
+    # Resolve binds HERE, in the host, so the widget receives the ordinary
+    # settings shape it has always received and needs no change to become
+    # context-aware. `unresolved` drives the placeholder below.
+    {settings, unresolved} = Binds.resolve(assigns.inst, assigns.context, assigns.scope)
+
     assigns =
       assigns
       |> assign(:widget, widget)
       |> assign(:placement, placement)
+      |> assign(:resolved_settings, settings)
+      |> assign(:unresolved, unresolved)
       |> assign(:available, widget && Registry.visible_for_scope?(widget, assigns.scope))
 
     ~H"""
@@ -737,16 +763,119 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         </span>
       </div>
     </div>
+    <%!-- A widget bound to something this page cannot supply gets an explicit
+          card, never a hidden one: hiding it reads as "my widget was deleted"
+          and leaves an unexplained hole in the grid. Falling back to some
+          arbitrary first record would be worse — that is how one project's
+          numbers end up on another project's screen. --%>
+    <div
+      :if={@widget && @available && @unresolved != []}
+      class="card bg-base-100 h-full border border-dashed border-base-300"
+    >
+      <div class="card-body p-4 items-center justify-center text-center text-sm text-base-content/50 gap-1">
+        <.icon name="hero-link-slash" class="w-5 h-5" />
+        <span class="font-medium">{@widget.name}</span>
+        <span>{missing_context_hint(@widget, @unresolved)}</span>
+      </div>
+    </div>
     <.live_component
-      :if={@widget && @available}
+      :if={@widget && @available && @unresolved == []}
       module={@widget.component}
       id={@inst["id"]}
-      settings={@inst["settings"] || %{}}
+      settings={@resolved_settings}
       view={(@placement || %{})["view"] || @inst["view"]}
       size={%{w: @placement["w"], h: @placement["h"]}}
       scope={@scope}
+      context={@context}
     />
     """
+  end
+
+  # Names the missing subject in the viewer's language. The widget's own
+  # settings-field LABEL is already translated catalog data supplied by the
+  # provider ("Project" -> "Projekt"), so it is the one translated noun
+  # available here — far better than the context key's last segment, which
+  # would drop a raw English word into an otherwise translated sentence.
+  defp missing_context_hint(widget, kinds) do
+    case subject_labels(widget, kinds) do
+      "" ->
+        gettext("Shown when this dashboard is on a page that provides what it needs.")
+
+      subject ->
+        gettext("Shown when this dashboard is on a page with a %{subject}.", subject: subject)
+    end
+  end
+
+  defp subject_labels(%Widget{settings_schema: schema}, kinds) when is_list(schema) do
+    kinds
+    |> Enum.map(fn kind ->
+      case Enum.find(schema, &(&1[:context] == kind)) do
+        %{label: label} when is_binary(label) -> translate_catalog(label)
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map_join(", ", &String.downcase/1)
+  end
+
+  defp subject_labels(_widget, _kinds), do: ""
+
+  attr(:kinds, :list, required: true)
+  attr(:context, :map, required: true)
+
+  @doc """
+  The **preview-as** bar: pick a stand-in subject while designing.
+
+  Only rendered when something on the canvas is actually bound to "the one this
+  page is about". Without it, every such widget shows its "needs a project"
+  placeholder for the whole time you are designing, which teaches the wrong
+  lesson — it looks like the widget is broken rather than waiting for a page.
+
+  The options come from the provider itself: whichever catalog widget declares
+  a settings field for this context kind already ships the picker list, so this
+  bar needs no knowledge of what a project is.
+  """
+  def preview_bar(assigns) do
+    ~H"""
+    <div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-200/60 px-4 py-1.5">
+      <span class="text-xs font-medium opacity-70">{gettext("Preview as")}</span>
+      <form :for={kind <- @kinds} phx-change="preview_as" class="flex items-center gap-1">
+        <input type="hidden" name="kind" value={kind} />
+        <select name="value" class="select select-xs select-bordered">
+          <option value="">{subject_placeholder(kind)}</option>
+          <option
+            :for={{label, value} <- context_options(kind)}
+            value={value}
+            selected={@context[kind] == value}
+          >
+            {label}
+          </option>
+        </select>
+      </form>
+      <span class="text-xs opacity-50">
+        {gettext("Only changes what you see here.")}
+      </span>
+    </div>
+    """
+  end
+
+  # Reuse the provider's own option list for this context kind — the same list
+  # its "a specific one" picker offers. Tuples are {label, value}; a plain
+  # string list is both.
+  defp context_options(kind) do
+    Enum.find_value(Registry.list(), [], fn widget ->
+      case Enum.find(widget.settings_schema, &(&1[:context] == kind)) do
+        %{options: options} when options != [] -> Enum.map(options, &normalize_option/1)
+        _ -> nil
+      end
+    end)
+  end
+
+  defp normalize_option({label, value}), do: {label, value}
+  defp normalize_option(value), do: {value, value}
+
+  defp subject_placeholder(kind) do
+    gettext("Pick a %{subject}", subject: kind |> String.split(".") |> List.last())
   end
 
   attr(:catalog, :list, required: true)
@@ -847,6 +976,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:grid_placement, :map, default: nil)
   attr(:cols, :integer, required: true)
   attr(:max_rows, :integer, required: true)
+  attr(:bind_sources, :map, default: %{})
 
   def settings_modal(assigns) do
     widget = Registry.get(assigns.instance["widget_key"])
@@ -883,7 +1013,16 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         </span>
       </:title>
 
-      <form id="widget-settings-form" phx-submit="save_settings" class="flex flex-col gap-3">
+      <%!-- phx-change reports the bind-source picker: its "which one" field
+      and hint depend on the chosen source, and without a change event they
+      would only update after saving and reopening — which reads as a dead
+      dropdown. --%>
+      <form
+        id="widget-settings-form"
+        phx-submit="save_settings"
+        phx-change="settings_changed"
+        class="flex flex-col gap-3"
+      >
           <.select
             :if={@widget && @widget.views != []}
             name="view"
@@ -992,6 +1131,8 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
             :for={field <- (@widget && @widget.settings_schema) || []}
             field={field}
             value={Map.get(@instance["settings"] || %{}, field.key)}
+            bind={field[:context] && Binds.binds(@instance)[field[:context]]}
+            source={field[:context] && @bind_sources[field[:context]]}
           />
       </form>
 
@@ -1021,10 +1162,29 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   # that (no %FormField{}) and give us the daisyUI 5 wrapper + label wiring.
   attr(:field, :map, required: true)
   attr(:value, :any, required: true)
+  attr(:bind, :any, default: nil)
+  attr(:source, :any, default: nil)
 
+  # Long-form text gets the kit's own rich editor rather than a bare textarea —
+  # it is what every other content surface here uses, and its mode (hybrid /
+  # visual / markdown / html) follows the site-wide Settings → Content Editor
+  # choice instead of being decided per widget.
+  #
+  # Leaf reports content to the HOST process (`{:leaf_changed, …}`), never to a
+  # LiveComponent, so `BuilderLive` collects it and merges it on save — see
+  # `settings_leaf_id/1` for the id contract that ties the two together.
   def settings_field(%{field: %{type: :text}} = assigns) do
     ~H"""
-    <.textarea name={"settings[#{@field.key}]"} label={translate_catalog(@field[:label]) || @field.key} value={@value} />
+    <div class="flex flex-col gap-1">
+      <span class="text-sm font-medium">{translate_catalog(@field[:label]) || @field.key}</span>
+      <.leaf_editor
+        id={settings_leaf_id(@field.key)}
+        content={@value || ""}
+        mode={editor_mode()}
+        height="240px"
+        debounce={400}
+      />
+    </div>
     """
   end
 
@@ -1035,6 +1195,44 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       label={translate_catalog(@field[:label]) || @field.key}
       checked={@value in [true, "true"]}
     />
+    """
+  end
+
+  # A field the provider marked with a context kind is not just a pick — it can
+  # FOLLOW the page it is shown on, or the person looking at it. The three
+  # sources are one dropdown in plain words; the fixed list stays underneath and
+  # only when "a specific one" is chosen, so the common case is one choice, not
+  # two. See `PhoenixKitDashboards.Binds` for why the choice is stored beside
+  # `settings` rather than inside it.
+  def settings_field(%{field: %{context: kind}} = assigns) when is_binary(kind) do
+    assigns = assign(assigns, :source, assigns.source || bind_source(assigns.bind))
+
+    ~H"""
+    <div class="flex flex-col gap-1">
+      <.select
+        name={"binds[#{@field[:context]}]"}
+        label={translate_catalog(@field[:label]) || @field.key}
+        value={@source}
+        options={[
+          {gettext("The one this page is about"), "slot"},
+          {gettext("Mine"), "viewer"},
+          {gettext("A specific one"), "pin"}
+        ]}
+      />
+      <.select
+        :if={@source == "pin"}
+        name={"settings[#{@field.key}]"}
+        label={gettext("Which one")}
+        value={@value}
+        options={@field[:options] || []}
+      />
+      <p :if={@source == "slot"} class="text-xs text-base-content/50">
+        {gettext("Follows whichever page this dashboard is shown on.")}
+      </p>
+      <p :if={@source == "viewer"} class="text-xs text-base-content/50">
+        {gettext("Each person sees their own.")}
+      </p>
+    </div>
     """
   end
 
@@ -1059,6 +1257,47 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
     />
     """
   end
+
+  # An instance placed before context existed has no bind at all, and its
+  # stored uuid is a deliberate historical choice — it resolves as a PIN, never
+  # silently reinterpreted as "this page's". Reinterpreting saved data is how
+  # someone's board quietly starts showing a different project.
+  @doc """
+  The DOM/editor id for a rich settings field.
+
+  Leaf's `{:leaf_changed, %{editor_id: …}}` is how the host learns what was
+  typed, so the id has to be reversible back to the settings key. The modal
+  edits one widget at a time, so the field key alone is unambiguous.
+  """
+  @spec settings_leaf_id(String.t()) :: String.t()
+  def settings_leaf_id(field_key), do: "pk-dash-set-" <> field_key
+
+  @doc "The settings key behind a `settings_leaf_id/1`, or `nil`."
+  @spec settings_leaf_key(String.t()) :: String.t() | nil
+  def settings_leaf_key("pk-dash-set-" <> field_key) when field_key != "", do: field_key
+  def settings_leaf_key(_other), do: nil
+
+  # Site-wide editor mode. Leaf's mode clauses have no catch-all, so anything
+  # unrecognised must be normalised here rather than blowing up inside Leaf —
+  # and `get_editor_mode/0` only exists on newer core builds.
+  defp editor_mode do
+    if function_exported?(PhoenixKit.Settings, :get_editor_mode, 0) do
+      normalize_mode(PhoenixKit.Settings.get_editor_mode())
+    else
+      :hybrid
+    end
+  rescue
+    _ -> :hybrid
+  end
+
+  defp normalize_mode(mode) when mode in [:visual, :hybrid, :markdown, :html], do: mode
+  defp normalize_mode(_mode), do: :hybrid
+
+  defp bind_source(nil), do: "pin"
+  defp bind_source("slot"), do: "slot"
+  defp bind_source("viewer"), do: "viewer"
+  defp bind_source(%{"pin" => _}), do: "pin"
+  defp bind_source(_other), do: "pin"
 
   def pixel_cells(inst) do
     px = Layout.pixel(inst)

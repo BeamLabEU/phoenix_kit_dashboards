@@ -73,6 +73,23 @@ defmodule PhoenixKitDashboards.Layouts do
   def first_layout_id(%Dashboard{} = dashboard), do: hd(layouts(dashboard))["id"]
 
   @doc """
+  The layout to render, given the one the viewer had selected.
+
+  Keeps `preferred` when it still exists on this dashboard, otherwise falls
+  back to the first. A viewer's choice must survive a live update — the board
+  re-renders on every broadcast, and re-deriving the landing layout each time
+  would yank someone back to Layout 1 mid-look — but it must not survive the
+  layout being renamed away or the slot switching to a different dashboard.
+  """
+  @spec keep_layout_id(Dashboard.t() | nil, String.t() | nil) :: String.t() | nil
+  def keep_layout_id(%Dashboard{} = dashboard, preferred) when is_binary(preferred) do
+    if get_layout(dashboard, preferred), do: preferred, else: first_layout_id(dashboard)
+  end
+
+  def keep_layout_id(%Dashboard{} = dashboard, _preferred), do: first_layout_id(dashboard)
+  def keep_layout_id(_dashboard, _preferred), do: nil
+
+  @doc """
   Mint a layout id not already used by `entries` — a short random id ("l" + 8
   hex chars), regenerated on the (astronomically unlikely) clash.
   """

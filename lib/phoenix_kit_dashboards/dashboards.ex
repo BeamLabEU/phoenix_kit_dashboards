@@ -14,6 +14,7 @@ defmodule PhoenixKitDashboards.Dashboards do
 
   alias PhoenixKit.PubSubHelper
   alias PhoenixKit.RepoHelper
+  alias PhoenixKitDashboards.Binds
   alias PhoenixKitDashboards.Grid
   alias PhoenixKitDashboards.Lattice
   alias PhoenixKitDashboards.Layout
@@ -226,7 +227,11 @@ defmodule PhoenixKitDashboards.Dashboards do
         scope: "personal",
         owner_user_uuid: user_uuid,
         layout: layout,
-        config: source.config
+        # A copy is not placed anywhere until someone says so. `config` now
+        # carries the personal placement (`"slot"`), and carrying it into the
+        # clone would give one person two dashboards claiming the same place,
+        # with the winner decided by row order.
+        config: Map.delete(source.config || %{}, "slot")
       },
       # A clone logs as dashboard.created like any create, but stays
       # distinguishable in the audit trail via the source pointer.
@@ -1124,6 +1129,7 @@ defmodule PhoenixKitDashboards.Dashboards do
           |> put_attr(attrs, :settings, "settings")
           |> put_attr(attrs, :view, "view")
           |> put_attr(attrs, :min_override, "min_override")
+          |> put_binds(attrs)
 
         inst ->
           inst
@@ -1148,6 +1154,25 @@ defmodule PhoenixKitDashboards.Dashboards do
     end)
     |> Map.new(fn {k, v} -> {to_string(k), v} end)
   end
+
+  # Where each context-bound setting gets its value FROM — stored beside
+  # `settings`, never inside it (see `PhoenixKitDashboards.Binds`). A `"pin"`
+  # source carries no id of its own: the id stays in the ordinary settings
+  # field the form already submits, so pinning is exactly the pre-context
+  # behaviour and needs no migration.
+  defp put_binds(inst, %{binds: binds}) when is_map(binds) do
+    Enum.reduce(binds, inst, fn {kind, source}, acc ->
+      case source do
+        "slot" -> Binds.put_bind(acc, kind, "slot")
+        "viewer" -> Binds.put_bind(acc, kind, "viewer")
+        # A pin is the absence of a bind, so an instance that never had one is
+        # byte-identical to one explicitly pinned.
+        _ -> Binds.put_bind(acc, kind, nil)
+      end
+    end)
+  end
+
+  defp put_binds(inst, _attrs), do: inst
 
   defp put_attr(inst, attrs, key, string_key) do
     case Map.fetch(attrs, key) do

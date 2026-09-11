@@ -51,18 +51,22 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     only: [
       viewable_by?: 2,
       actor_opts: 1,
+      actor_uuid: 1,
       scope_label: 1
     ]
 
   import PhoenixKitDashboards.Web.BuilderComponents
 
   alias Phoenix.LiveView.JS
+  alias PhoenixKitDashboards.Binds
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Lattice
   alias PhoenixKitDashboards.Layout
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Registry
   alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Slot
   alias PhoenixKitDashboards.Widget
 
   # How often the host checks whether any live widget is due for a refresh.
@@ -74,6 +78,9 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     # (e.g. a wall TV) re-renders the instant anyone edits it from elsewhere.
     if connected?(socket) and is_binary(params["uuid"]) do
       Dashboards.subscribe(params["uuid"])
+      # Placements live elsewhere, so the header's "Shown in" needs its own
+      # subscription to stay true while someone rebinds from the Places screen.
+      Placements.subscribe()
     end
 
     {:ok,
@@ -87,7 +94,19 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
      # The layout id currently in inline-rename mode (nil = none).
      |> assign(:renaming_layout, nil)
      # QoL: show the empty grid cells while designing (session-local toggle).
-     |> assign(:show_grid_lines, false)}
+     |> assign(:show_grid_lines, false)
+     # PREVIEW CONTEXT. A dashboard is built here, in the library, before
+     # anyone says where it will be shown — so a widget bound to "the one this
+     # page is about" has nothing to resolve and would show its placeholder
+     # while you design. Choosing a subject here stands in for the page it will
+     # eventually sit on. Session-local and never persisted: it is a lens on
+     # the canvas, not a property of it.
+     |> assign(:preview_context, %{})
+     # Live bind-source choices while the settings modal is open. Cleared with
+     # the modal, because they describe an unsaved form, not the dashboard.
+     |> assign(:bind_sources, %{})
+     |> assign(:leaf_values, %{})
+     |> assign(:places, [])}
   end
 
   @impl true
@@ -105,6 +124,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
            socket
            |> assign(:dashboard, dashboard)
            |> assign(:page_title, dashboard.title)
+           |> assign_places()
            |> resolve_active_layout(params["layout"])
            |> maybe_schedule_refresh()}
         else
@@ -483,14 +503,37 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
     # Only for a widget that exists — a crafted/stale id must not park a
     # dangling id in the assign (the modal render would crash on nil).
     if settings_instance_data(socket.assigns.dashboard, instance_id) do
-      {:noreply, assign(socket, :settings_instance, instance_id)}
+      {:noreply,
+       assign(socket, settings_instance: instance_id, bind_sources: %{}, leaf_values: %{})}
     else
       {:noreply, socket}
     end
   end
 
   defp do_handle_event("close_settings", _params, socket) do
-    {:noreply, assign(socket, :settings_instance, nil)}
+    {:noreply, assign(socket, settings_instance: nil, bind_sources: %{}, leaf_values: %{})}
+  end
+
+  defp do_handle_event("settings_changed", params, socket) do
+    sources =
+      case params["binds"] do
+        %{} = binds -> Map.filter(binds, fn {k, v} -> is_binary(k) and is_binary(v) end)
+        _ -> %{}
+      end
+
+    {:noreply, assign(socket, :bind_sources, sources)}
+  end
+
+  defp do_handle_event("preview_as", %{"kind" => kind, "value" => value}, socket)
+       when is_binary(kind) do
+    context =
+      if is_binary(value) and value != "" do
+        Map.put(socket.assigns.preview_context, kind, value)
+      else
+        Map.delete(socket.assigns.preview_context, kind)
+      end
+
+    {:noreply, assign(socket, :preview_context, context)}
   end
 
   defp do_handle_event("save_settings", params, socket) do
@@ -533,13 +576,59 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   # No open settings modal (e.g. a double submit racing close_settings) is a
   # no-op — otherwise configure_widget would write the unchanged layout and log
   # a phantom "widget_configured" activity for a nil instance.
+  # Where each context-bound field takes its value from ("slot" / "viewer" /
+  # "pin"), submitted by the settings form alongside the plain settings. Only
+  # string keys and string values survive — these are attacker-controlled form
+  # params, and `Binds` normalizes the source itself.
+  defp maybe_put_binds(attrs, binds) when is_map(binds) do
+    clean =
+      binds
+      |> Enum.filter(fn {k, v} -> is_binary(k) and is_binary(v) end)
+      |> Map.new()
+
+    if clean == %{}, do: attrs, else: Map.put(attrs, :binds, clean)
+  end
+
+  defp maybe_put_binds(attrs, _binds), do: attrs
+
+  defp assign_places(socket) do
+    case socket.assigns[:dashboard] do
+      %Dashboard{uuid: uuid} ->
+        # By NAME, not by placement: one board reachable from the admin home
+        # both for everyone and for a role is still shown in one place, and
+        # "Admin home  Admin home" answers nothing the single chip didn't.
+        assign(
+          socket,
+          :places,
+          uuid
+          |> Placements.places_for(actor_uuid(socket))
+          |> Enum.uniq_by(&place_label/1)
+        )
+
+      _ ->
+        assign(socket, :places, [])
+    end
+  rescue
+    _ -> assign(socket, :places, [])
+  end
+
+  # Through the slot's own backend: the msgid for "Projects dashboard" lives in
+  # the module that declared the slot, not here.
+  defp place_label(%{label: label}) when is_binary(label) and label != "", do: label
+  defp place_label(%{slot: %Slot{} = slot}), do: Slot.localized_name(slot)
+  defp place_label(%{slot_key: key}), do: key
+
   defp save_settings(socket, instance_id, params) do
     grid? = Dashboard.layout_mode(socket.assigns.dashboard) == "grid"
+    leaf_values = socket.assigns.leaf_values
 
+    # A Leaf field has no form input, so its content is not in `params` — merge
+    # what the editor reported. Form params still win for everything else.
     attrs =
-      %{settings: params["settings"] || %{}}
+      %{settings: Map.merge(params["settings"] || %{}, leaf_values)}
       |> then(&if grid?, do: &1, else: maybe_put_view(&1, params["view"]))
       |> maybe_put_min_override(params["min_override"])
+      |> maybe_put_binds(params["binds"])
 
     # On the grid the view is a PER-LAYOUT setting (stored on the active
     # layout's placement); everything else stays instance-level. `is_binary`
@@ -559,7 +648,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         socket
       end
 
-    socket = assign(socket, :settings_instance, nil)
+    socket = assign(socket, settings_instance: nil, bind_sources: %{}, leaf_values: %{})
 
     case Dashboards.configure_widget(
            socket.assigns.dashboard,
@@ -686,6 +775,24 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   end
 
   @impl true
+  def handle_info({:placements_changed, _slot_key}, socket) do
+    {:noreply, assign_places(socket)}
+  end
+
+  # Leaf reports to the host process, so the settings modal's rich fields land
+  # here rather than in the form's params. Stash by settings key and merge on
+  # save; a message for anything that is not one of our editors is ignored so
+  # another Leaf on the page cannot write into a widget's settings.
+  def handle_info({:leaf_changed, %{editor_id: editor_id, markdown: markdown}}, socket)
+      when is_binary(markdown) do
+    case settings_leaf_key(editor_id) do
+      nil -> {:noreply, socket}
+      key -> {:noreply, update(socket, :leaf_values, &Map.put(&1, key, markdown))}
+    end
+  end
+
+  def handle_info({:leaf_changed, _payload}, socket), do: {:noreply, socket}
+
   def handle_info(msg, socket) do
     Logger.debug("[Dashboards] Unhandled info: #{inspect(msg)}")
     {:noreply, socket}
@@ -917,6 +1024,20 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           >
             <.icon name="hero-pencil" class="w-3.5 h-3.5" />
           </.link>
+          <%!-- WHERE this board is shown. Editing a dashboard that happens to
+          be the company's admin home should never be a surprise, and the
+          builder was the one place that said nothing about it. --%>
+          <.link
+            navigate={Paths.places()}
+            class="flex flex-wrap items-center gap-1 text-xs hover:opacity-80"
+            title={gettext("Choose where this dashboard is shown")}
+          >
+            <span class="opacity-50">{gettext("Shown in")}:</span>
+            <span :if={@places == []} class="opacity-40">{gettext("nowhere yet")}</span>
+            <span :for={place <- @places} class="badge badge-ghost badge-sm">
+              {place_label(place)}
+            </span>
+          </.link>
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -947,6 +1068,12 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         </div>
       </div>
 
+      <.preview_bar
+        :if={Binds.required_kinds(@dashboard.layout) != []}
+        kinds={Binds.required_kinds(@dashboard.layout)}
+        context={@preview_context}
+      />
+
       <div class="relative flex flex-1 min-h-0">
         <.grid
           dashboard={@dashboard}
@@ -954,6 +1081,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           active_layout={@active_layout}
           renaming_layout={@renaming_layout}
           show_grid_lines={@show_grid_lines}
+          context={@preview_context}
         />
         <.catalog_drawer catalog={@catalog} />
       </div>
@@ -966,6 +1094,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         grid_placement={Dashboards.resolve_placement(@dashboard, @settings_instance, @active_layout)}
         cols={Dashboards.grid_cols(@dashboard, @active_layout)}
         max_rows={Dashboards.grid_rows(@dashboard, @active_layout)}
+        bind_sources={@bind_sources}
       />
     </div>
     """

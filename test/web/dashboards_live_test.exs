@@ -3,6 +3,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Web.Helpers
 
   defp sign_in(conn) do
     user = user_fixture()
@@ -126,7 +127,11 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
       conn: conn
     } do
       {conn, _user} = sign_in(conn)
-      role_uuid = Ecto.UUID.generate()
+      # A REAL role. The handler refuses a uuid that names none — an unchecked
+      # one either publishes the board to a role the sender picked or creates
+      # an orphan row nobody can ever see, since the changeset only checks that
+      # a role uuid is present.
+      [%{uuid: role_uuid} | _] = Helpers.list_roles()
 
       {:ok, view, _html} = live(conn, "/en/admin/dashboards/new")
 
@@ -146,6 +151,28 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
       assert dashboard.scope == "role"
       assert dashboard.role_uuid == role_uuid
       assert dashboard.owner_user_uuid == nil
+    end
+
+    test "a role_uuid naming no role falls back to personal rather than orphaning the board",
+         %{conn: conn} do
+      {conn, user} = sign_in(conn)
+
+      {:ok, view, _html} = live(conn, "/en/admin/dashboards/new")
+
+      {:error, {:live_redirect, %{to: to}}} =
+        render_submit(view, "save", %{
+          "title" => "Nowhere Board",
+          "type" => "grid",
+          "scope" => "role",
+          "role_uuid" => Ecto.UUID.generate()
+        })
+
+      "/en/admin/dashboards/" <> uuid = to
+      dashboard = Dashboards.get(uuid)
+
+      assert dashboard.scope == "personal"
+      assert dashboard.role_uuid == nil
+      assert dashboard.owner_user_uuid == user.uuid
     end
   end
 
@@ -233,6 +260,35 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
       render_click(view, "delete", %{"uuid" => role_dash.uuid})
 
       assert Dashboards.get(role_dash.uuid) != nil
+    end
+
+    # The mirror of the delete test above, on the page that had no such gate.
+    # `manageable_by?/2` only restricts PERSONAL dashboards — it answers true
+    # for every role-scoped one — so the settings page let a holder of the
+    # dashboards permission open a role board they are not a member of and
+    # save it as personal, which makes the editor its owner: the board leaves
+    # the role and the role's members lose it.
+    test "cannot open, or re-own, a role dashboard the actor can't see", %{conn: conn} do
+      {conn, user} = sign_in(conn)
+
+      {:ok, role_dash} =
+        Dashboards.create(%{
+          title: "Other team board",
+          scope: "role",
+          role_uuid: Ecto.UUID.generate()
+        })
+
+      # The settings page refuses to load it at all.
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, "/en/admin/dashboards/#{role_dash.uuid}/edit")
+
+      assert to =~ "/admin/dashboards"
+
+      # And the save path refuses too, so a crafted submit cannot take it over.
+      fresh = Dashboards.get(role_dash.uuid)
+      assert fresh.scope == "role"
+      assert fresh.owner_user_uuid == nil
+      refute fresh.owner_user_uuid == user.uuid
     end
 
     test "a malformed delete uuid is a no-op, not a crash", %{conn: conn} do

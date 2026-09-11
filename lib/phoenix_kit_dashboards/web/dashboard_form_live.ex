@@ -16,11 +16,13 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   require Logger
 
   import PhoenixKitDashboards.Web.Helpers,
-    only: [actor_uuid: 1, actor_opts: 1, list_roles: 0, manageable_by?: 2]
+    only: [actor_uuid: 1, actor_opts: 1, list_roles: 0, manageable_by?: 2, viewable_by?: 2]
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Slot
 
   @impl true
   def mount(_params, _session, socket) do
@@ -34,6 +36,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
         {:noreply,
          socket
          |> assign(:dashboard, nil)
+         |> assign(:placed_in, [])
          |> assign(:page_title, gettext("New dashboard"))}
 
       :edit ->
@@ -43,10 +46,11 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
 
   defp load_dashboard(socket, uuid) do
     with %Dashboard{} = dashboard <- uuid && Dashboards.get(uuid),
-         true <- manageable_by?(dashboard, actor_uuid(socket)) do
+         true <- editable_by?(dashboard, socket) do
       {:noreply,
        socket
        |> assign(:dashboard, dashboard)
+       |> assign(:placed_in, placed_in(dashboard))
        |> assign(
          :page_title,
          gettext("Dashboard settings")
@@ -112,7 +116,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
     # this form sat open; fail closed like a fresh load would.
     fresh = Dashboards.get(dashboard.uuid)
 
-    if is_nil(fresh) or not manageable_by?(fresh, actor_uuid(socket)) do
+    if is_nil(fresh) or not editable_by?(fresh, socket) do
       {:noreply,
        socket
        |> put_flash(:error, gettext("Dashboard not found."))
@@ -149,17 +153,40 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
     end
   end
 
+  # BOTH gates, the way the manage page and the builder pair them.
+  # `manageable_by?/2` only restricts PERSONAL dashboards — it answers true for
+  # every role-scoped one, for any actor. On its own it let a holder of the
+  # dashboards permission open a role dashboard they are not a member of and
+  # save it as `scope: "personal"`, which makes the editor its owner: the board
+  # leaves the role and the role's members lose it. Seeing it is the missing
+  # half, exactly as the delete path already spells out.
+  defp editable_by?(dashboard, socket) do
+    viewable_by?(dashboard, socket) and manageable_by?(dashboard, actor_uuid(socket))
+  end
+
   # The scope + scope-specific attrs from the form params. Switching an
   # existing dashboard to "personal" makes the editor its owner (a scope must
   # always point at its audience — the changeset enforces it).
   defp scope_attrs(%{"scope" => "system"}, _socket),
     do: %{scope: "system", owner_user_uuid: nil, role_uuid: nil}
 
-  defp scope_attrs(%{"scope" => "role", "role_uuid" => uuid}, _socket)
-       when is_binary(uuid) and uuid != "",
-       do: %{scope: "role", role_uuid: uuid, owner_user_uuid: nil}
+  # The role picker is hidden unless the dashboard is ALREADY role-scoped, but
+  # the handler still has to check: the value arrives from the wire, and an
+  # unchecked one either publishes the board to a role the sender picked or —
+  # if it names no role at all — creates a row nobody can ever see, since the
+  # changeset only checks that a role uuid is present.
+  defp scope_attrs(%{"scope" => "role", "role_uuid" => uuid}, socket)
+       when is_binary(uuid) and uuid != "" do
+    if Enum.any?(list_roles(), &(&1.uuid == uuid)) do
+      %{scope: "role", role_uuid: uuid, owner_user_uuid: nil}
+    else
+      personal_attrs(socket)
+    end
+  end
 
-  defp scope_attrs(_params, socket),
+  defp scope_attrs(_params, socket), do: personal_attrs(socket)
+
+  defp personal_attrs(socket),
     do: %{scope: "personal", owner_user_uuid: actor_uuid(socket), role_uuid: nil}
 
   # Role-scoped dashboards are HIDDEN for now (they were briefly offered in the
@@ -168,6 +195,22 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   # creating them. An already-role-scoped dashboard is grandfathered on edit so
   # saving can't silently convert it to personal.
   defp role_scope_visible?(dashboard), do: match?(%{scope: "role"}, dashboard)
+
+  # The places this dashboard currently fills, named the way the viewer sees
+  # them — so "making it personal" states its actual consequence rather than
+  # leaving it to be discovered when a page goes blank.
+  defp placed_in(%Dashboard{uuid: uuid}) do
+    uuid
+    |> Placements.places_for()
+    |> Enum.reject(&(&1.audience == "personal"))
+    |> Enum.map(fn
+      %{slot: %Slot{} = slot} -> Slot.localized_name(slot)
+      %{slot_key: key} -> key
+    end)
+    |> Enum.uniq()
+  rescue
+    _ -> []
+  end
 
   defp blank_to_default(nil, default), do: default
   defp blank_to_default("", default), do: default
@@ -195,7 +238,7 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
         </h1>
       </div>
 
-      <div class="card bg-base-100 shadow">
+      <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
           <form id="dashboard-form" phx-submit="save" class="flex flex-col gap-4">
             <.input
@@ -246,6 +289,19 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
               }
             />
 
+            <%!-- Visibility is not just who can open it: only a SHARED dashboard
+            may be placed. Someone who picks Personal and then cannot find their
+            board in Places has been told nothing — so say it here. --%>
+            <p class="-mt-1 text-xs text-base-content/60">
+              {gettext("Only shared dashboards can be shown in a place. A personal one is yours alone.")}
+            </p>
+
+            <div :if={@placed_in != []} class="alert alert-warning py-2 text-sm">
+              {gettext("This dashboard is shown in %{places}. Making it personal removes it from there.",
+                places: Enum.join(@placed_in, ", ")
+              )}
+            </div>
+
             <.select
               :if={role_scope_visible?(@dashboard)}
               name="role_uuid"
@@ -255,19 +311,15 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
             />
 
             <div class="flex justify-end gap-2 pt-2">
-              <.link navigate={Paths.index()} class="btn btn-ghost">
+              <.button variant="ghost" navigate={Paths.index()}>
                 {gettext("Cancel")}
-              </.link>
-              <button
-                type="submit"
-                phx-disable-with={gettext("Saving…")}
-                class="btn btn-primary"
-              >
+              </.button>
+              <.button type="submit" phx-disable-with={gettext("Saving…")}>
                 <.icon :if={is_nil(@dashboard)} name="hero-plus" class="w-4 h-4" />
                 {if @dashboard,
                   do: gettext("Save"),
                   else: gettext("Create")}
-              </button>
+              </.button>
             </div>
           </form>
         </div>

@@ -83,7 +83,15 @@ defmodule PhoenixKitDashboards.MixProject do
       # named layouts), and V133 (1.7.145) created the phoenix_kit_dashboards
       # table; an older 1.7.x would resolve an older pin yet lack the `config`
       # column the layout engine reads.
-      pk_dep(:phoenix_kit, "~> 2.0"),
+      #
+      # 2.15.0 is the REAL floor, not a rounded-up guess: `Placements.write/3`
+      # calls `Settings.update_setting_with_module/4`, and the arity-4 form
+      # (the `opts` that carry the actor into settings history) first shipped
+      # in 2.15.0. Below it the call raises `UndefinedFunctionError`, which
+      # `write/3` rescues into a generic message — so on an older 2.x every
+      # place/unplace/reprioritise would fail SILENTLY and the admin would
+      # only ever see "That didn't work. Try again."
+      pk_dep(:phoenix_kit, "~> 2.15"),
 
       # Per-module i18n — own Gettext backend for the sidebar tab labels and
       # this module's own UI strings (see `PhoenixKitDashboards.Gettext`).

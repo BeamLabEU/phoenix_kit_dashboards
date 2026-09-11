@@ -8,6 +8,8 @@ defmodule PhoenixKitDashboards.Web.Helpers do
 
   use Gettext, backend: PhoenixKitDashboards.Gettext
 
+  alias PhoenixKit.Users.Auth
+  alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKit.Users.Roles
   alias PhoenixKitDashboards.Dashboards
 
@@ -49,6 +51,15 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   end
 
   @doc """
+  The current user's uuid from a bare SCOPE, for render-side callers that have
+  no socket (the slot chrome decides whether to show "Edit layout" from the
+  scope it was handed).
+  """
+  @spec scope_actor_uuid(map() | nil) :: String.t() | nil
+  def scope_actor_uuid(%{user: %{uuid: uuid}}) when is_binary(uuid), do: uuid
+  def scope_actor_uuid(_scope), do: nil
+
+  @doc """
   Keyword opts threading the acting user's uuid into context mutations.
 
   Returns `[actor_uuid: uuid]`, or `[]` when there is no current user (so the
@@ -70,15 +81,25 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   """
   @spec user_role_uuids(Phoenix.LiveView.Socket.t()) :: [String.t()]
   def user_role_uuids(socket) do
-    case socket.assigns[:phoenix_kit_current_scope] do
-      %{cached_roles: names} when is_list(names) and names != [] ->
-        roles = socket.assigns[:roles] || list_roles()
-        for role <- roles, role.name in names, do: role.uuid
-
-      _ ->
-        []
-    end
+    scope_role_uuids(socket.assigns[:phoenix_kit_current_scope], socket.assigns[:roles])
   end
+
+  @doc """
+  The same mapping from a bare scope, for callers that have no socket.
+
+  `PhoenixKitDashboards.Placements` resolves role placements during render and
+  from contexts with no LiveView around, so the role lookup cannot live behind
+  a socket. `user_role_uuids/1` delegates here, so the two can never disagree
+  about which roles a viewer holds.
+  """
+  @spec scope_role_uuids(map() | nil, [struct()] | nil) :: [String.t()]
+  def scope_role_uuids(scope, roles \\ nil)
+
+  def scope_role_uuids(%{cached_roles: names}, roles) when is_list(names) and names != [] do
+    for role <- roles || list_roles(), role.name in names, do: role.uuid
+  end
+
+  def scope_role_uuids(_scope, _roles), do: []
 
   @doc """
   Whether `dashboard` is viewable by the socket's user (own personal · any
@@ -102,6 +123,97 @@ defmodule PhoenixKitDashboards.Web.Helpers do
     do: dashboard.owner_user_uuid == actor_uuid
 
   def manageable_by?(_dashboard, _actor_uuid), do: true
+
+  @doc """
+  Apply the locale the host put in an EMBED session.
+
+  `live_render/3` spawns a FRESH process and the Gettext locale lives in the
+  process dictionary, so it is not inherited from the page around it. Both
+  hosts already send the key — core's `/admin` and the projects hub — and
+  without this every string these views render falls back to the backend
+  default while the page around them is correctly translated, which reads as a
+  half-translated page rather than as missing wiring.
+
+  Both backends are set: this module's own for its strings, and core's for
+  anything rendered through a core component.
+  """
+  @spec put_embed_locale(map()) :: :ok | nil
+  def put_embed_locale(session) when is_map(session) do
+    case Map.get(session, "locale") do
+      locale when is_binary(locale) and locale != "" ->
+        Gettext.put_locale(PhoenixKitDashboards.Gettext, locale)
+        Gettext.put_locale(PhoenixKitWeb.Gettext, locale)
+
+      _ ->
+        :ok
+    end
+  end
+
+  def put_embed_locale(_session), do: :ok
+
+  @doc """
+  Reconstruct the viewer's user + scope from an EMBED session.
+
+  A dashboard rendered with `live_render/3` inside another page (the projects
+  hub tab, core's admin home) mounts off-router, so none of the `on_mount`
+  hooks that normally assign the current user have run. Prefer core's canonical
+  helper when the running core exposes it; fall back to resolving the uuid the
+  host put in the session.
+
+  `Code.ensure_loaded?/1` comes BEFORE `function_exported?/3` deliberately: on a
+  cold VM the module may not be loaded yet and `function_exported?/3` answers
+  false WITHOUT loading it, silently taking the legacy path against a core that
+  does export the helper.
+  """
+  @spec assign_embed_identity(Phoenix.LiveView.Socket.t(), map()) ::
+          Phoenix.LiveView.Socket.t()
+  def assign_embed_identity(socket, session) do
+    if is_nil(socket.assigns[:phoenix_kit_current_scope]) do
+      do_assign_embed_identity(socket, session)
+    else
+      socket
+    end
+  end
+
+  defp do_assign_embed_identity(socket, session) do
+    if Code.ensure_loaded?(PhoenixKitWeb.Users.Auth) and
+         function_exported?(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, 2) do
+      # credo:disable-for-next-line Credo.Check.Refactor.Apply
+      apply(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, [socket, session])
+    else
+      {user, scope} = resolve_embed_identity(session["current_user_uuid"])
+
+      Phoenix.Component.assign(socket,
+        phoenix_kit_current_user: user,
+        phoenix_kit_current_scope: scope
+      )
+    end
+  end
+
+  defp resolve_embed_identity(uuid) when is_binary(uuid) and uuid != "" do
+    user = uuid |> Auth.get_user() |> Auth.ensure_active_user()
+    {user, Scope.for_user(user)}
+  rescue
+    _ -> {nil, Scope.for_user(nil)}
+  end
+
+  defp resolve_embed_identity(_uuid), do: {nil, Scope.for_user(nil)}
+
+  @doc """
+  Whether this viewer may change what is shown in a place.
+
+  Placing a dashboard is an administrative act separate from editing one: a
+  person may own a dashboard they are not allowed to publish onto the admin
+  home.
+  """
+  @spec can_manage_places?(map() | nil) :: boolean()
+  def can_manage_places?(nil), do: false
+
+  def can_manage_places?(scope) do
+    Code.ensure_loaded?(Scope) and Scope.has_module_access?(scope, "dashboards")
+  rescue
+    _ -> false
+  end
 
   @doc "All roles (for pickers); `[]` when the roles API is unavailable."
   @spec list_roles() :: [struct()]

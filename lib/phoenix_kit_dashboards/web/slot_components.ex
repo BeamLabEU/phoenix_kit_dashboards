@@ -1,0 +1,258 @@
+defmodule PhoenixKitDashboards.Web.SlotComponents do
+  @moduledoc """
+  The chrome around a dashboard rendered **in a slot** — the header, the
+  several-dashboards switcher, the empty state and the board frame.
+
+  Shared by `Web.SlotLive` (a module's dashboard tab) and the admin home, so
+  the two surfaces cannot drift apart in how they name things or where the
+  edit affordance sits.
+
+  ## One horizontal tab strip, ever
+
+  A dashboard already draws a tab strip for its own named layouts ("Layout 1",
+  "Wall TV"). Putting a second strip above it — one meaning "which dashboard",
+  one meaning "which layout of this dashboard" — is a collision every panel
+  seat independently flagged, and people would click the wrong row for a year.
+  So when a slot holds several dashboards they render as the strip, and the
+  layout picker degrades to a compact `Layout: …` select inside the board.
+  """
+
+  use PhoenixKitWeb, :html
+  use Gettext, backend: PhoenixKitDashboards.Gettext
+
+  import PhoenixKitDashboards.Web.BuilderComponents, only: [grid_mode: 1, free_mode: 1]
+
+  alias PhoenixKitDashboards.Layouts
+  alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Schemas.Dashboard
+  alias PhoenixKitDashboards.Slot
+  alias PhoenixKitDashboards.Web.Helpers
+
+  attr(:slot, :any, required: true)
+  attr(:dashboards, :list, required: true)
+  attr(:active_index, :integer, required: true)
+  attr(:tier, :atom, required: true)
+  attr(:active, :map, required: true)
+  attr(:scope, :any, default: nil)
+  attr(:can_fork?, :boolean, default: false)
+  attr(:mine?, :boolean, default: false)
+  attr(:id_prefix, :string, default: "")
+  attr(:active_layout, :any, default: nil)
+
+  def slot_header(assigns) do
+    assigns =
+      assigns
+      |> assign(:layouts, Layouts.layouts(assigns.active))
+      |> assign(:mode, Dashboard.layout_mode(assigns.active))
+
+    ~H"""
+    <div class="flex flex-wrap items-center gap-2">
+      <%!-- Several dashboards in one slot: THIS is the page's only tab strip. --%>
+      <div
+        :if={length(@dashboards) > 1}
+        role="tablist"
+        aria-label={gettext("Dashboards")}
+        class="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden"
+      >
+        <.button
+          :for={{dashboard, index} <- Enum.with_index(@dashboards)}
+          variant={if index == @active_index, do: "primary", else: "ghost"}
+          size="sm"
+          role="tab"
+          aria-selected={to_string(index == @active_index)}
+          phx-click="select_dashboard"
+          phx-value-index={index}
+          class="max-w-48 shrink-0"
+        >
+          <span class="truncate">{dashboard.title}</span>
+        </.button>
+      </div>
+
+      <.link
+        :if={length(@dashboards) <= 1}
+        navigate={Paths.builder(@active.uuid)}
+        class="min-w-0 grow truncate font-semibold hover:text-primary"
+      >
+        {@active.title}
+      </.link>
+      <div :if={length(@dashboards) > 1} class="grow"></div>
+
+      <%!-- Which rule won. Only shown when it is not the plain company-wide
+      answer, because "Everyone" on every page is noise; "Yours" and the role
+      name are the ones that explain why your page differs from a colleague's. --%>
+      <span :if={tier_label(@tier)} class="badge badge-ghost badge-sm shrink-0">
+        {tier_label(@tier)}
+      </span>
+
+      <%!-- A named layout is chosen with a compact select, never a second tab
+      strip: the strip above already means "which dashboard", and two rows of
+      tabs meaning different things is the collision this design exists to
+      avoid. Hidden entirely when there is only one layout. --%>
+      <form
+        :if={length(@layouts) > 1}
+        id={"#{@id_prefix}layout-form"}
+        phx-change="select_layout"
+        class="shrink-0"
+      >
+        <select name="layout" class="select select-sm select-bordered" aria-label={gettext("Layout")}>
+          <option :for={entry <- @layouts} value={entry["id"]} selected={entry["id"] == @active_layout}>
+            {entry["name"]}
+          </option>
+        </select>
+      </form>
+
+      <%!-- A placed board is the one most likely to be put on a wall, so it
+      needs fullscreen at least as much as the builder does. Targets THIS
+      surface's fit container — the ids are prefixed per surface. --%>
+      <button
+        id={"#{@id_prefix}fullscreen-btn"}
+        phx-hook="DashboardFullscreen"
+        data-target={"#{@id_prefix}dashboard-#{if @mode == "free", do: "free", else: "grid"}-fit"}
+        type="button"
+        class="btn btn-ghost btn-sm btn-square shrink-0"
+        title={gettext("Full screen")}
+      >
+        <.icon name="hero-arrows-pointing-out" class="h-4 w-4" />
+      </button>
+
+      <%!-- The per-person tier. Copying leaves the shared board untouched and
+      still visible to everyone else; resetting UNPLACES the copy rather than
+      deleting it, so an afternoon of arranging widgets survives the click. --%>
+      <.button
+        :if={@can_fork?}
+        variant="outline"
+        size="sm"
+        phx-click="fork_personal"
+        class="shrink-0 gap-1"
+        title={gettext("Copy this and make the copy your own version")}
+      >
+        <.icon name="hero-user" class="h-4 w-4" />
+        {gettext("Make it mine")}
+      </.button>
+      <.button
+        :if={@mine?}
+        variant="outline"
+        size="sm"
+        phx-click="reset_personal"
+        class="shrink-0 gap-1"
+        title={gettext("Stop using your own version here")}
+      >
+        <.icon name="hero-arrow-uturn-left" class="h-4 w-4" />
+        {gettext("Use the shared one")}
+      </.button>
+
+      <%!-- TWO different jobs, and conflating them is why this page felt like
+      a dead end: "Edit layout" changes what is ON this dashboard, "Change"
+      changes WHICH dashboard is shown here. Without the second, a place could
+      only ever be filled once — the picker lived in the empty state and
+      vanished the moment it was used. --%>
+      <.button
+        :if={Helpers.can_manage_places?(@scope)}
+        variant="outline"
+        size="sm"
+        navigate={Paths.places()}
+        class="shrink-0 gap-1"
+        title={gettext("Choose which dashboard is shown here")}
+      >
+        <.icon name="hero-arrows-right-left" class="h-4 w-4" />
+        {gettext("Change")}
+      </.button>
+      <.button
+        :if={Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
+        variant="outline"
+        size="sm"
+        navigate={Paths.builder(@active.uuid)}
+        class="shrink-0 gap-1"
+      >
+        <.icon name="hero-pencil-square" class="h-4 w-4" />
+        {gettext("Edit layout")}
+      </.button>
+    </div>
+    """
+  end
+
+  attr(:slot, :any, default: nil)
+  attr(:scope, :any, default: nil)
+  attr(:any_dashboards?, :boolean, default: true)
+
+  def slot_empty(assigns) do
+    ~H"""
+    <div class="card bg-base-100 shadow-xl border-2 border-dashed border-base-300">
+      <div class="card-body items-center gap-2 py-10 text-center">
+        <.icon name="hero-squares-2x2" class="h-8 w-8 opacity-40" />
+        <p class="text-sm opacity-70">
+          {gettext("No dashboard is shown here yet.")}
+        </p>
+        <%!-- Sending someone to the picker when nothing exists to pick is the
+        same dead end the Places page had: point at the work instead. --%>
+        <p :if={@slot && not @any_dashboards?} class="max-w-md text-sm opacity-60">
+          {gettext("Build one first — then come back here and choose where it appears.")}
+        </p>
+        <.button :if={@slot && not @any_dashboards?} size="sm" navigate={Paths.new()}>
+          <.icon name="hero-plus" class="h-4 w-4" />
+          {gettext("Create a dashboard")}
+        </.button>
+        <.button :if={@slot && @any_dashboards?} size="sm" navigate={Paths.places()}>
+          {gettext("Choose a dashboard")}
+        </.button>
+      </div>
+    </div>
+    """
+  end
+
+  attr(:active, :map, required: true)
+  attr(:mode, :string, required: true)
+  attr(:active_layout, :any, required: true)
+  attr(:design_h, :integer, required: true)
+  attr(:context, :map, default: %{})
+  attr(:id_prefix, :string, default: "")
+  attr(:scope, :any, default: nil)
+
+  def slot_board(assigns) do
+    ~H"""
+    <div
+      :if={@mode == "grid"}
+      class="flex flex-col overflow-hidden rounded-lg border border-base-200"
+      style={"height: min(80vh, #{@design_h + 40}px);"}
+    >
+      <.grid_mode
+        dashboard={@active}
+        scope={@scope}
+        active_layout={@active_layout}
+        show_grid_lines={false}
+        empty={@active.layout == []}
+        readonly
+        id_prefix={@id_prefix}
+        context={@context}
+      />
+    </div>
+    <div
+      :if={@mode == "free"}
+      class="flex flex-col overflow-hidden rounded-lg border border-base-200"
+      style="height: 75vh;"
+    >
+      <.free_mode
+        dashboard={@active}
+        scope={@scope}
+        readonly
+        id_prefix={@id_prefix}
+        context={@context}
+      />
+    </div>
+    """
+  end
+
+  @doc """
+  Human name for the audience rule that won, or `nil` for the company-wide
+  default (which needs no label).
+  """
+  @spec tier_label(atom()) :: String.t() | nil
+  def tier_label(:personal), do: gettext("Yours")
+  def tier_label(:role), do: gettext("For your role")
+  def tier_label(_tier), do: nil
+
+  @doc "Whether a slot may hold more than one dashboard (drives the strip)."
+  @spec many?(Slot.t() | nil) :: boolean()
+  def many?(%Slot{} = slot), do: Slot.many?(slot)
+  def many?(_slot), do: false
+end
