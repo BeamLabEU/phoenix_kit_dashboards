@@ -594,7 +594,16 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   defp assign_places(socket) do
     case socket.assigns[:dashboard] do
       %Dashboard{uuid: uuid} ->
-        assign(socket, :places, Placements.places_for(uuid, actor_uuid(socket)))
+        # By NAME, not by placement: one board reachable from the admin home
+        # both for everyone and for a role is still shown in one place, and
+        # "Admin home  Admin home" answers nothing the single chip didn't.
+        assign(
+          socket,
+          :places,
+          uuid
+          |> Placements.places_for(actor_uuid(socket))
+          |> Enum.uniq_by(&place_label/1)
+        )
 
       _ ->
         assign(socket, :places, [])
