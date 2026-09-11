@@ -133,6 +133,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
 
   attr(:slot, :any, default: nil)
   attr(:scope, :any, default: nil)
+  attr(:any_dashboards?, :boolean, default: true)
 
   def slot_empty(assigns) do
     ~H"""
@@ -142,7 +143,16 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         <p class="text-sm opacity-70">
           {gettext("No dashboard is shown here yet.")}
         </p>
-        <.button :if={@slot} size="sm" navigate={Paths.places()}>
+        <%!-- Sending someone to the picker when nothing exists to pick is the
+        same dead end the Places page had: point at the work instead. --%>
+        <p :if={@slot && not @any_dashboards?} class="max-w-md text-sm opacity-60">
+          {gettext("Build one first — then come back here and choose where it appears.")}
+        </p>
+        <.button :if={@slot && not @any_dashboards?} size="sm" navigate={Paths.new()}>
+          <.icon name="hero-plus" class="h-4 w-4" />
+          {gettext("Create a dashboard")}
+        </.button>
+        <.button :if={@slot && @any_dashboards?} size="sm" navigate={Paths.places()}>
           {gettext("Choose a dashboard")}
         </.button>
       </div>

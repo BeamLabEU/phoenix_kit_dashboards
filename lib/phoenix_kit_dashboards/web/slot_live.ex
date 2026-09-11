@@ -110,6 +110,7 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
       active: nil,
       page_title: gettext("Dashboard")
     )
+    |> assign_any_dashboards()
     |> Personal.assign_flags()
   end
 
@@ -146,9 +147,18 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
       active_index: min(socket.assigns.active_index, max(length(dashboards) - 1, 0)),
       page_title: (slot && Slot.localized_name(slot)) || gettext("Dashboard")
     )
+    |> assign_any_dashboards()
     |> assign_active()
     |> Personal.assign_flags()
     |> Refresh.reschedule()
+  end
+
+  # Whether there is anything to pick at all. Drives the empty state's call to
+  # action: offering "choose a dashboard" when none exist is a dead end.
+  defp assign_any_dashboards(socket) do
+    assign(socket, :any_dashboards?, Dashboards.list_system() != [])
+  rescue
+    _ -> assign(socket, :any_dashboards?, true)
   end
 
   defp assign_active(socket) do
@@ -233,7 +243,12 @@ defmodule PhoenixKitDashboards.Web.SlotLive do
         mine?={@mine?}
       />
 
-      <.slot_empty :if={is_nil(@active)} slot={@slot} scope={@phoenix_kit_current_scope} />
+      <.slot_empty
+        :if={is_nil(@active)}
+        slot={@slot}
+        scope={@phoenix_kit_current_scope}
+        any_dashboards?={@any_dashboards?}
+      />
 
       <.slot_board
         :if={@active}

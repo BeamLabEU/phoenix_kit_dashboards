@@ -200,6 +200,26 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
         </span>
       </div>
 
+      <%!-- Nothing to place. Every place below is inert until a dashboard
+      exists, so say so ONCE at the top rather than repeating it on each card —
+      and send them where the work actually starts. --%>
+      <div
+        :if={@shareable == [] and @groups != []}
+        class="card bg-base-100 shadow-xl border-2 border-dashed border-base-300"
+      >
+        <div class="card-body items-center gap-2 py-8 text-center">
+          <.icon name="hero-squares-plus" class="h-8 w-8 opacity-40" />
+          <p class="font-medium">{gettext("You have no dashboards yet")}</p>
+          <p class="max-w-md text-sm opacity-70">
+            {gettext("Build one first — then come back here and choose where it appears.")}
+          </p>
+          <.button size="sm" navigate={Paths.new()} class="mt-1">
+            <.icon name="hero-plus" class="h-4 w-4" />
+            {gettext("Create a dashboard")}
+          </.button>
+        </div>
+      </div>
+
       <div :if={@groups == []} class="card bg-base-100 shadow-xl border-2 border-dashed border-base-300">
         <div class="card-body items-center gap-1 py-10 text-center">
           <.icon name="hero-rectangle-group" class="h-8 w-8 opacity-40" />
@@ -263,6 +283,12 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
             size="sm"
             phx-click={if @open, do: "close", else: "open"}
             phx-value-slot={@slot.key}
+            disabled={@shareable == []}
+            title={
+              if @shareable == [],
+                do: gettext("Create a dashboard first"),
+                else: nil
+            }
           >
             {if @open, do: gettext("Done"), else: gettext("Change")}
           </.button>
