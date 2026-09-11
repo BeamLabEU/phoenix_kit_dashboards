@@ -277,10 +277,10 @@ defmodule PhoenixKitDashboards.Placements do
   def delete(slot_key, attrs, opts \\ []) when is_binary(slot_key) do
     attrs = stringify(attrs)
 
-    remaining =
-      slot_key
-      |> for_slot()
-      |> Enum.reject(&same_placement?(&1, attrs))
+    # Remove ONE entry, not every match. Duplicates can no longer be created,
+    # but legacy rows may still hold a pair — and two rows on screen means two
+    # Remove buttons, so one click removing both is a surprise with no undo.
+    remaining = drop_first(for_slot(slot_key), attrs, [])
 
     write(slot_key, remaining, opts)
   end
@@ -307,6 +307,14 @@ defmodule PhoenixKitDashboards.Placements do
       end)
 
     write(slot_key, updated, opts)
+  end
+
+  defp drop_first([], _attrs, acc), do: Enum.reverse(acc)
+
+  defp drop_first([placement | rest], attrs, acc) do
+    if same_placement?(placement, attrs),
+      do: Enum.reverse(acc) ++ rest,
+      else: drop_first(rest, attrs, [placement | acc])
   end
 
   defp write(slot_key, placements, opts) do
@@ -534,15 +542,29 @@ defmodule PhoenixKitDashboards.Placements do
     end
   end
 
-  defp validate_cardinality(%Slot{cardinality: :many}, _slot_key, _placement), do: :ok
+  # `:many` means several DIFFERENT dashboards, shown as tabs — never the same
+  # one twice, which is two identical tabs and no way to tell them apart. A
+  # `:many` slot used to skip every duplicate check to get there.
+  defp validate_cardinality(%Slot{cardinality: :many}, slot_key, placement) do
+    if placed_already?(slot_key, placement),
+      do: {:error, :dashboard_already_placed},
+      else: :ok
+  end
 
   defp validate_cardinality(%Slot{}, slot_key, placement) do
-    taken? =
-      slot_key
-      |> for_slot()
-      |> Enum.any?(&same_audience?(&1, placement))
+    cond do
+      placed_already?(slot_key, placement) -> {:error, :dashboard_already_placed}
+      audience_taken?(slot_key, placement) -> {:error, :audience_already_placed}
+      true -> :ok
+    end
+  end
 
-    if taken?, do: {:error, :audience_already_placed}, else: :ok
+  defp placed_already?(slot_key, placement) do
+    slot_key |> for_slot() |> Enum.any?(&same_placement?(&1, placement))
+  end
+
+  defp audience_taken?(slot_key, placement) do
+    slot_key |> for_slot() |> Enum.any?(&same_audience?(&1, placement))
   end
 
   defp build(%{"audience" => "everyone"} = attrs) do

@@ -141,6 +141,9 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   defp error_message(:audience_already_placed),
     do: gettext("This place already shows a dashboard for that audience.")
 
+  defp error_message(:dashboard_already_placed),
+    do: gettext("That dashboard is already shown here for that audience.")
+
   defp error_message(:role_required), do: gettext("Pick a role.")
   defp error_message(:unknown_dashboard), do: gettext("Pick a dashboard.")
   defp error_message(:unknown_slot), do: gettext("That place no longer exists.")

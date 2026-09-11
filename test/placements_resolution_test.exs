@@ -201,6 +201,81 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
     end
   end
 
+  describe "the same dashboard placed twice" do
+    defp shared(title) do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, d} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: title,
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      d
+    end
+
+    test "is refused, even in a slot that takes several" do
+      # `:many` means several DIFFERENT dashboards shown as tabs. The same one
+      # twice is two identical tabs — never what anyone meant, and the slot
+      # skipped every duplicate check to get there.
+      d = shared("Test Shared Dashboard")
+
+      assert {:ok, _} =
+               Placements.put("core.admin_home", %{
+                 "audience" => "everyone",
+                 "dashboard_uuid" => d.uuid
+               })
+
+      assert {:error, :dashboard_already_placed} =
+               Placements.put("core.admin_home", %{
+                 "audience" => "everyone",
+                 "dashboard_uuid" => d.uuid
+               })
+    end
+
+    test "but two DIFFERENT dashboards for one audience are still fine" do
+      a = shared("Site health")
+      b = shared("User activity")
+
+      assert {:ok, _} =
+               Placements.put("core.admin_home", %{
+                 "audience" => "everyone",
+                 "dashboard_uuid" => a.uuid
+               })
+
+      assert {:ok, _} =
+               Placements.put("core.admin_home", %{
+                 "audience" => "everyone",
+                 "dashboard_uuid" => b.uuid
+               })
+
+      assert {:everyone, [_, _]} = Placements.resolve("core.admin_home", nil)
+    end
+
+    test "removing one duplicate leaves the other, not neither" do
+      # Legacy rows can still hold a duplicate. Two rows on screen means two
+      # Remove buttons, so one click must remove one — deleting both is a
+      # surprise you cannot undo.
+      d = shared("Test Shared Dashboard")
+
+      put_blob(%{
+        "core.admin_home" => [
+          %{"audience" => "everyone", "dashboard_uuid" => d.uuid, "position" => 0},
+          %{"audience" => "everyone", "dashboard_uuid" => d.uuid, "position" => 1}
+        ]
+      })
+
+      {:ok, remaining} =
+        Placements.delete("core.admin_home", %{
+          "audience" => "everyone",
+          "dashboard_uuid" => d.uuid
+        })
+
+      assert length(remaining) == 1
+    end
+  end
+
   describe "slot tab visibility" do
     test "a place with nothing in it shows no tab, even to an administrator" do
       # An empty place is navigation nobody asked for. Being able to MANAGE
