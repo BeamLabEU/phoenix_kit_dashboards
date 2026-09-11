@@ -168,7 +168,13 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
     <h1>: the admin header breadcrumb already shows @page_title, so the page
     reclaims the space (workspace canon — see DashboardsLive). --%>
     <div class="flex flex-col mx-auto max-w-5xl px-4 py-6 gap-6">
-      <.admin_page_header subtitle={gettext("Choose which dashboard appears where, and who sees it.")}>
+      <%!-- The explanation goes in the default slot, not `subtitle:` — that attr
+      only renders inside the component's `title` branch, and this page has no
+      in-page <h1> on purpose (the breadcrumb already shows it). --%>
+      <.admin_page_header>
+        <p class="text-sm text-base-content/60">
+          {gettext("Choose which dashboard appears where, and who sees it.")}
+        </p>
         <:actions>
           <form phx-change="search" phx-submit="search">
             <.input
