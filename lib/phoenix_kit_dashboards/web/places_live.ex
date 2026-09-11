@@ -48,7 +48,6 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
      socket
      |> assign(
        page_title: gettext("Places"),
-       query: "",
        open_slot: nil,
        form_audience: "everyone",
        error: nil
@@ -63,10 +62,6 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   # ── Events ─────────────────────────────────────────────────────────
 
   @impl true
-  def handle_event("search", %{"query" => query}, socket) do
-    {:noreply, socket |> assign(:query, query) |> load()}
-  end
-
   def handle_event("open", %{"slot" => slot_key}, socket) do
     {:noreply, assign(socket, open_slot: slot_key, error: nil, form_audience: "everyone")}
   end
@@ -111,15 +106,7 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
 
   defp load(socket) do
     scope = socket.assigns[:phoenix_kit_current_scope]
-    query = String.downcase(String.trim(socket.assigns.query || ""))
-
-    groups =
-      scope
-      |> Slots.grouped_for_scope()
-      |> Enum.map(fn {label, slots} ->
-        {label, Enum.filter(slots, &matches?(&1, label, query))}
-      end)
-      |> Enum.reject(fn {_label, slots} -> slots == [] end)
+    groups = Slots.grouped_for_scope(scope)
 
     assign(socket,
       groups: groups,
@@ -129,17 +116,17 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
       # excluded at the picker as well as in the context, so the refusal is
       # never a surprise the admin discovers after choosing.
       shareable: Enum.reject(Dashboards.list_system(), &is_nil/1),
+      # Whether they have ANY dashboard, shared or not — the two empty states
+      # need different words and point at different fixes.
+      any_dashboards?: any_dashboards?(socket),
       roles: Helpers.list_roles()
     )
   end
 
-  defp matches?(_slot, _label, ""), do: true
-
-  defp matches?(%Slot{} = slot, label, query) do
-    # Match the TRANSLATED name: searching for what is on screen has to work.
-    String.contains?(String.downcase(Slot.localized_name(slot)), query) or
-      String.contains?(String.downcase(slot.name), query) or
-      String.contains?(String.downcase(label), query)
+  defp any_dashboards?(socket) do
+    Dashboards.list_for_user(Helpers.actor_uuid(socket), Helpers.user_role_uuids(socket)) != []
+  rescue
+    _ -> false
   end
 
   defp error_message(:personal_not_shareable),
@@ -173,22 +160,8 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
       in-page <h1> on purpose (the breadcrumb already shows it). --%>
       <.admin_page_header>
         <p class="text-sm text-base-content/60">
-          {gettext("Choose which dashboard appears where, and who sees it.")}
+          {gettext("Choose which dashboard appears where, and who sees it. Only shared dashboards can be placed.")}
         </p>
-        <:actions>
-          <form phx-change="search" phx-submit="search">
-            <.input
-              type="search"
-              name="query"
-              value={@query}
-              placeholder={gettext("Search places")}
-              class="input-sm w-56"
-            />
-          </form>
-          <.button variant="outline" size="sm" navigate={Paths.index()}>
-            {gettext("All dashboards")}
-          </.button>
-        </:actions>
       </.admin_page_header>
 
       <div :if={@error} class="alert alert-error py-2 text-sm">{@error}</div>
@@ -209,13 +182,27 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
       >
         <div class="card-body items-center gap-2 py-8 text-center">
           <.icon name="hero-squares-plus" class="h-8 w-8 opacity-40" />
-          <p class="font-medium">{gettext("You have no dashboards yet")}</p>
-          <p class="max-w-md text-sm opacity-70">
-            {gettext("Build one first — then come back here and choose where it appears.")}
+
+          <%!-- Two different problems. Telling someone who just built three
+          personal dashboards that they have none is false, and hides the fix:
+          they need to SHARE one, not make another. --%>
+          <p class="font-medium">
+            {if @any_dashboards?,
+              do: gettext("None of your dashboards are shared yet"),
+              else: gettext("You have no dashboards yet")}
           </p>
-          <.button size="sm" navigate={Paths.new()} class="mt-1">
+          <p class="max-w-md text-sm opacity-70">
+            {if @any_dashboards?,
+              do:
+                gettext("A place can only show a shared dashboard. Open one and set its visibility to Shared."),
+              else: gettext("Build one first — then come back here and choose where it appears.")}
+          </p>
+          <.button :if={not @any_dashboards?} size="sm" navigate={Paths.new()} class="mt-1">
             <.icon name="hero-plus" class="h-4 w-4" />
             {gettext("Create a dashboard")}
+          </.button>
+          <.button :if={@any_dashboards?} variant="outline" size="sm" navigate={Paths.index()} class="mt-1">
+            {gettext("Open your dashboards")}
           </.button>
         </div>
       </div>
@@ -359,7 +346,10 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
           </label>
 
           <label class="form-control min-w-56">
-            <span class="label-text text-xs">{gettext("Dashboard")}</span>
+            <span class="label-text text-xs">
+              {gettext("Dashboard")}
+              <span class="opacity-60">({gettext("shared only")})</span>
+            </span>
             <select name="dashboard_uuid" class="select select-sm select-bordered">
               <option value="">{gettext("Pick a dashboard")}</option>
               <option :for={dashboard <- @shareable} value={dashboard.uuid}>
