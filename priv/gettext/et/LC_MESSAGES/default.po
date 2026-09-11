@@ -125,7 +125,7 @@ msgstr "Veerud"
 msgid "Compact (counts)"
 msgstr "Kompaktne (arvud)"
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:911
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:920
 #, elixir-autogen, elixir-format
 msgid "Could not add widget."
 msgstr "Vidina lisamine ebaõnnestus."
@@ -192,14 +192,14 @@ msgstr "Töölaua paigutused"
 
 #: lib/phoenix_kit_dashboards/web/builder_live.ex:118
 #: lib/phoenix_kit_dashboards/web/builder_live.ex:182
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:921
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:930
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:62
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:122
 #, elixir-autogen, elixir-format
 msgid "Dashboard not found."
 msgstr "Töölauda ei leitud."
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:1014
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:1023
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:56
 #: lib/phoenix_kit_dashboards/web/dashboard_form_live.ex:213
 #, elixir-autogen, elixir-format
@@ -284,8 +284,8 @@ msgstr "Sobita ekraaniga"
 msgid "Fixed once the dashboard is created."
 msgstr "Fikseeritud pärast töölaua loomist."
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:1044
-#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:216
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:1053
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:259
 #: lib/phoenix_kit_dashboards/web/slot_components.ex:113
 #, elixir-autogen, elixir-format
 msgid "Full screen"
@@ -361,11 +361,6 @@ msgstr "Uus töölaud"
 msgid "New dashboard title"
 msgstr "Uue töölaua pealkiri"
 
-#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:226
-#, elixir-autogen, elixir-format
-msgid "No dashboard linked yet — pick a shared dashboard in the Modules panel."
-msgstr "Ühtegi töölauda pole veel lingitud — vali jagatud töölaud mooduli paneelilt."
-
 #: lib/phoenix_kit_dashboards/web/dashboards_live.ex:170
 #, elixir-autogen, elixir-format
 msgid "No dashboards yet."
@@ -391,7 +386,7 @@ msgstr "Märkus"
 msgid "Open"
 msgstr "Ava"
 
-#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:221
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:264
 #, elixir-autogen, elixir-format
 msgid "Open in Dashboards"
 msgstr "Ava Töölaudades"
@@ -411,7 +406,7 @@ msgstr "Piksel"
 msgid "Pixel (free canvas)"
 msgstr "Piksel (vaba lõuend)"
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:930
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:939
 #, elixir-autogen, elixir-format
 msgid "Reloaded — this dashboard was just edited elsewhere."
 msgstr "Laaditi uuesti — seda töölauda muudeti just mujal."
@@ -510,12 +505,7 @@ msgstr "Suurus"
 msgid "Size & position (px)"
 msgstr "Suurus ja asukoht (px)"
 
-#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:232
-#, elixir-autogen, elixir-format
-msgid "The linked dashboard is not shared — only shared dashboards can appear here."
-msgstr "Lingitud töölaud pole jagatud — siin saavad kuvada ainult jagatud töölauad."
-
-#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:229
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:281
 #, elixir-autogen, elixir-format
 msgid "The linked dashboard no longer exists."
 msgstr "Lingitud töölauda enam ei eksisteeri."
@@ -525,7 +515,7 @@ msgstr "Lingitud töölauda enam ei eksisteeri."
 msgid "This dashboard has no widgets yet."
 msgstr "Sellel töölaual pole veel vidinaid."
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:761
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:770
 #, elixir-autogen, elixir-format
 msgid "This dashboard was deleted."
 msgstr "See töölaud kustutati."
@@ -598,7 +588,7 @@ msgstr "Vidinate kataloog"
 msgid "Widget settings"
 msgstr "Vidina seaded"
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:1057
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:1066
 #, elixir-autogen, elixir-format
 msgid "Widgets"
 msgstr "Vidinad"
@@ -625,7 +615,7 @@ msgstr "Y"
 msgid "You do not have access to this dashboard."
 msgstr "Sul pole sellele töölauale ligipääsu."
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:746
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:755
 #, elixir-autogen, elixir-format
 msgid "You no longer have access to this dashboard."
 msgstr "Sul pole enam sellele töölauale ligipääsu."
@@ -908,13 +898,13 @@ msgstr "%{place} — rollile"
 msgid "%{place} — only you"
 msgstr "%{place} — ainult sina"
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:1026
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:1035
 #: lib/phoenix_kit_dashboards/web/dashboards_live.ex:208
 #, elixir-autogen, elixir-format
 msgid "Shown in"
 msgstr "Kuvatakse"
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:1027
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:1036
 #: lib/phoenix_kit_dashboards/web/dashboards_live.ex:213
 #, elixir-autogen, elixir-format
 msgid "nowhere yet"
@@ -935,7 +925,7 @@ msgstr "käib ühe kirje kohta"
 msgid "The first page you see after signing in"
 msgstr "Esimene leht, mida pärast sisselogimist näed"
 
-#: lib/phoenix_kit_dashboards/web/builder_live.ex:1024
+#: lib/phoenix_kit_dashboards/web/builder_live.ex:1033
 #, elixir-autogen, elixir-format
 msgid "Choose where this dashboard is shown"
 msgstr "Vali, kus seda töölauda kuvatakse"
@@ -1032,8 +1022,28 @@ msgstr "ainult jagatud"
 msgid "That dashboard is already shown here for that audience."
 msgstr "See töölaud on siin selle sihtrühma jaoks juba kuvatud."
 
-#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:199
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:242
 #: lib/phoenix_kit_dashboards/web/slot_components.ex:97
 #, elixir-autogen, elixir-format
 msgid "Layout"
 msgstr "Paigutus"
+
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:274
+#, elixir-autogen, elixir-format
+msgid "No dashboard here yet."
+msgstr "Siin pole veel töölauda."
+
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:276
+#, elixir-autogen, elixir-format
+msgid "Show one on every project page"
+msgstr "Näita seda igal projektilehel"
+
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:284
+#, elixir-autogen, elixir-format
+msgid "The dashboard pinned to this project is not shared — only shared dashboards can be pinned here."
+msgstr "Sellele projektile kinnitatud töölaud pole jagatud — siia saab kinnitada ainult jagatud töölaudu."
+
+#: lib/phoenix_kit_dashboards/web/project_dashboard_live.ex:278
+#, elixir-autogen, elixir-format
+msgid "— or pick one for this project alone under ⋮ → Edit → Modules → Dashboard."
+msgstr "— või vali ainult selle projekti jaoks: ⋮ → Muuda → Moodulid → Dashboard."

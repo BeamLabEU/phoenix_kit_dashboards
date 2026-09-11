@@ -8,15 +8,31 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
 
   Off-router mount (`live_render`, no `handle_params/3`), per the projects
   embed-session contract: `"project_uuid"` / `"config"` /
-  `"current_user_uuid"` / `"locale"`. The extension's config carries the
-  linkage — `config["dashboard_uuid"]`, picked in the project's Modules panel.
+  `"current_user_uuid"` / `"locale"`.
 
-  ## Only SHARED dashboards render here
+  ## Which dashboard, and who decided
 
-  A project tab is a project-wide surface; personal and role dashboards
+  Two things can name it, and the more specific one wins:
+
+  1. **This project's own pick** — `config["dashboard_uuid"]`, set in the
+     project's Modules panel. It is a statement about ONE project, so it
+     overrides anything set module-wide.
+  2. **The `projects.project` placement** — set once on the Places screen and
+     answering for every project, with the usual audience tiers (personal →
+     role → everyone). This is the reason a slot exists for this surface at
+     all: one board serves every project instead of needing a copy each.
+
+  Both are live. Re-pointing the placement re-renders every project page that
+  is not overriding it, without a reload.
+
+  ## Only SHARED dashboards may be PINNED here
+
+  A per-project pin is a project-wide surface; personal and role dashboards
   carry per-user visibility that a shared pane must not blur. The picker
   offers only `scope == "system"` dashboards and the render path re-checks
-  (a re-scoped dashboard downgrades to an explanatory card, live). Widget
+  (a re-scoped dashboard downgrades to an explanatory card, live). A
+  PLACEMENT needs no such check: resolution already answers per viewer, so
+  the personal tier is a board its owner is entitled to see. Widget
   bodies still gate per-viewer: the embed identity is reconstructed from
   `current_user_uuid` and each widget re-checks
   `Registry.visible_for_scope?/2`, so a viewer without a module's
@@ -27,7 +43,8 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   The builder's fitted board (`BuilderComponents.grid_mode/free_mode`) in
   `readonly` mode — no drag/resize hooks, no card chrome, no catalog — with
   an `id_prefix` so the fit hooks' DOM ids stay unique inside the project
-  page. Grid dashboards show their FIRST layout (v1: no layout switcher).
+  page. A dashboard with several named layouts offers a compact layout
+  picker; the viewer's choice survives live updates.
   Live widgets keep refreshing via a re-hosted copy of the builder's
   `:refresh_tick` loop, and edits made in the builder elsewhere appear live
   (`Dashboards.subscribe/1`).
@@ -47,12 +64,14 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Layouts
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Registry
   alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Widget
 
   @refresh_tick_ms 1000
   @id_prefix "pk-projtab-"
+  @slot_key "projects.project"
 
   @impl true
   def mount(_params, session, socket) do
@@ -65,10 +84,18 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
       # session; it simply never passed it down.
       |> assign(:context, project_context(session))
       |> assign(:id_prefix, @id_prefix)
+      # Kept so a placement change can re-decide without the hub re-mounting
+      # us: the per-project pin still has to win, and it arrives only here.
+      |> assign(:ext_config, session["config"])
       |> assign_embed_identity(session)
       |> load_dashboard(session["config"])
 
     if connected?(socket) do
+      # The board this tab shows can change from OUTSIDE the project — an
+      # admin binding one on the Places screen. Without this the tab would
+      # keep saying "nothing linked" until someone reloaded the page.
+      Placements.subscribe()
+
       case socket.assigns.dashboard do
         %Dashboard{uuid: uuid} -> Dashboards.subscribe(uuid)
         _ -> :ok
@@ -103,6 +130,22 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
 
   def handle_info({:dashboard_deleted, _uuid}, socket) do
     {:noreply, assign(socket, dashboard: nil, state: :missing)}
+  end
+
+  def handle_info({:placements_changed, _slot_key}, socket) do
+    socket = load_dashboard(socket, socket.assigns[:ext_config])
+
+    # Follow whatever we ended up on. Subscribing is idempotent per topic, and
+    # a dashboard that dropped out simply stops mattering — its messages fall
+    # through the clause above.
+    if connected?(socket) do
+      case socket.assigns.dashboard do
+        %Dashboard{uuid: uuid} -> Dashboards.subscribe(uuid)
+        _ -> :ok
+      end
+    end
+
+    {:noreply, maybe_schedule_refresh(socket)}
   end
 
   # ── Refresh loop (re-hosted from the builder; process-dictionary state
@@ -222,14 +265,23 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
         </.link>
       </div>
 
+      <%!-- Two routes reach this tab, so the empty state names both. The
+      module-wide one is a real page and is linked; the per-project one is a
+      drawer with no address, so it is spelled out as the click path — the
+      old copy said "the Modules panel" and there is no such thing on screen
+      to look for. --%>
       <.empty_note :if={@state == :unconfigured}>
-        {gettext("No dashboard linked yet — pick a shared dashboard in the Modules panel.")}
+        {gettext("No dashboard here yet.")}
+        <.link navigate={Paths.places()} class="link link-primary">
+          {gettext("Show one on every project page")}
+        </.link>
+        {gettext("— or pick one for this project alone under ⋮ → Edit → Modules → Dashboard.")}
       </.empty_note>
       <.empty_note :if={@state == :missing}>
         {gettext("The linked dashboard no longer exists.")}
       </.empty_note>
       <.empty_note :if={@state == :not_shared}>
-        {gettext("The linked dashboard is not shared — only shared dashboards can appear here.")}
+        {gettext("The dashboard pinned to this project is not shared — only shared dashboards can be pinned here.")}
       </.empty_note>
 
       <div
@@ -312,15 +364,10 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   defp resolve_embed_identity(_), do: {nil, Scope.for_user(nil)}
 
   defp load_dashboard(socket, config) do
-    uuid = is_map(config) && config["dashboard_uuid"]
-
-    dashboard = if is_binary(uuid) and uuid != "", do: Dashboards.get(uuid)
-
-    state =
-      cond do
-        !(is_binary(uuid) and uuid != "") -> :unconfigured
-        is_nil(dashboard) -> :missing
-        true -> state_for(dashboard)
+    {dashboard, state} =
+      case pinned_uuid(config) do
+        nil -> placed(socket)
+        uuid -> pinned(uuid)
       end
 
     layout = Layouts.keep_layout_id(dashboard, socket.assigns[:active_layout])
@@ -332,6 +379,40 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
       active_layout: layout,
       design_h: design_height(dashboard, layout)
     )
+  end
+
+  defp pinned_uuid(config) do
+    case is_map(config) && config["dashboard_uuid"] do
+      uuid when is_binary(uuid) and uuid != "" -> uuid
+      _ -> nil
+    end
+  end
+
+  # This project's own pick. Shared-only, and re-checked here rather than
+  # trusted from the picker: a dashboard re-scoped after it was pinned must
+  # downgrade to the explanatory card rather than leak.
+  defp pinned(uuid) do
+    case Dashboards.get(uuid) do
+      %Dashboard{} = dashboard -> {dashboard, state_for(dashboard)}
+      _ -> {nil, :missing}
+    end
+  end
+
+  # The module-wide placement, resolved FOR THIS VIEWER. No scope re-check:
+  # unlike a pin, resolution has already decided what this person may see —
+  # the personal tier is by definition a board its owner owns, and refusing
+  # it here would make "shared only" mean "nobody's own", which is not the
+  # rule. `resolve_one/2` stops at the first match, so a slot declared
+  # `cardinality: :one` costs one lookup.
+  defp placed(socket) do
+    case Placements.resolve_one(@slot_key, socket.assigns[:phoenix_kit_current_scope]) do
+      %Dashboard{} = dashboard -> {dashboard, :ok}
+      _ -> {nil, :unconfigured}
+    end
+  rescue
+    _ -> {nil, :unconfigured}
+  catch
+    :exit, _ -> {nil, :unconfigured}
   end
 
   defp state_for(%Dashboard{scope: "system"}), do: :ok
