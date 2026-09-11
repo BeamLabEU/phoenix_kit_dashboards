@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 - 2026-09-11
+
+### Added
+
+- **Dashboard placement slots** (#10). Modules can now declare a **slot** —
+  a place a dashboard can be shown, such as a sidebar sub-tab
+  (`:module_tab`), a tab rendered inside one of the declaring module's own
+  records (`:record_tab`), or the shared admin home page (`:admin_home`) —
+  the same duck-typed, zero-dependency style as the widget provider
+  contract. An admin binds a **system** dashboard to a slot for an
+  audience (everyone, or one role) from a new **Places** screen
+  (`/admin/dashboards/places`), with personal/role/everyone resolution
+  (`PhoenixKitDashboards.Placements.resolve/3`) and per-viewer "make it
+  mine" forking (`Web.Personal`) shared by every surface that renders a
+  place.
+- **Context binds.** A widget's settings field can declare `context:
+  "<kind>"`, letting a placed dashboard resolve that field to "the record
+  this page is about" or "mine" instead of a fixed pin — resolved on the
+  host side (`PhoenixKitDashboards.Binds`) so no widget needs to change.
+  An unresolvable bind always renders an explanatory card, never a
+  fallback record.
+- **Admin-home slot.** The core admin `/admin` landing page can now embed
+  one placed dashboard (`Web.AdminHomeLive`), gated the same way as any
+  other `:admin_home` slot.
+
+### Changed
+
+- Raised the `phoenix_kit` floor to `~> 2.15` (was `~> 2.0`). The declared
+  `~> 2.0` floor resolved core 2.13.5, whose
+  `Settings.update_setting_with_module/3` is arity 3;
+  `Placements.write/3` needs the arity-4 version core first shipped in
+  2.15.0. Below that floor, `write/3`'s rescue silently swallowed every
+  place/unplace/reprioritise call — the whole feature dead on arrival with
+  no visible error. `core_pin_conformance_test.exs` now pins the real
+  floor by name.
+
+### Fixed
+
+Found and fixed during this PR's own pre-merge quality sweep (see
+`dev_docs/pull_requests/2026/10-dashboard-placement-slots/QUALITY_SWEEP.md`):
+
+- The dashboard settings page could re-own a **role** dashboard: it
+  gated on `manageable_by?/2`, which only restricts personal boards, so
+  any holder of the `dashboards` permission could open a role board they
+  don't belong to and save it as their own.
+- `role_uuid` was written straight from the request without checking it
+  against the real role list.
+- Placement **writes** never re-checked the slot's own permission (the
+  read path already did); the slot key is a hidden form input, so the
+  permission-filtered list was display-only. `set_priority/3` also
+  discarded a refusal, so a blocked reorder looked like a silent revert.
+- The project-tab viewer adopted `{:dashboard_updated, _}` for whatever
+  dashboard it last resolved to and never unsubscribed, so re-pointing a
+  project's dashboard could have an edit to the *old* board swap it back
+  in.
+- Neither off-router-mounted view (`live_render`) applied the locale it
+  documented receiving, so their strings fell back to English inside an
+  otherwise-translated page.
+
 ## 0.4.0 - 2026-08-12
 
 ### Added

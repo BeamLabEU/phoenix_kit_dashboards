@@ -249,8 +249,9 @@ defmodule PhoenixKitDashboards.Placements do
     * a **personal** dashboard in a shared slot — its per-user visibility
       cannot be honoured by a shared surface, and binding it would publish one
       person's private canvas to the company;
-    * a **pixel** dashboard in a slot that is not a wall surface — a pixel
-      canvas is a TV board, not an admin page;
+    * a **pixel** dashboard in the `:admin_home` slot — a pixel canvas is a
+      TV board, not an admin page (other surfaces auto-scale it via
+      `DashboardFreeFit` and accept it);
     * a second placement in a `:one` slot for the same audience.
   """
   @spec put(String.t(), map(), keyword()) :: {:ok, [placement()]} | {:error, term()}
