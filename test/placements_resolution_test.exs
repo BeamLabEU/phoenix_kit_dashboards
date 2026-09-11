@@ -10,7 +10,9 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
   """
   use PhoenixKitDashboards.DataCase, async: false
 
+  alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKitDashboards.Placements
+  alias PhoenixKitDashboards.Slots
 
   defp put_blob(blob) do
     PhoenixKit.Settings.update_setting_with_module(
@@ -143,6 +145,56 @@ defmodule PhoenixKitDashboards.PlacementsResolutionTest do
 
       assert {:everyone, [only]} = Placements.resolve("core.admin_home", nil)
       assert only.uuid == dashboard.uuid
+    end
+  end
+
+  describe "slot tab visibility" do
+    test "a place with nothing in it shows no tab, even to an administrator" do
+      # An empty place is navigation nobody asked for. Being able to MANAGE
+      # dashboards is not a reason to carry a permanent tab that only ever says
+      # "nothing here" — Places is where you go to fill one.
+      refute Slots.slot_tab_visible?("core.admin_home", nil)
+    end
+
+    test "a place with a shared placement shows its tab" do
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, dashboard} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "D",
+          scope: "system",
+          owner_user_uuid: user.uuid
+        })
+
+      {:ok, _} =
+        Placements.put("core.admin_home", %{
+          "audience" => "everyone",
+          "dashboard_uuid" => dashboard.uuid
+        })
+
+      assert Slots.slot_tab_visible?("core.admin_home", nil)
+    end
+
+    test "someone whose ONLY board here is their own still gets the tab" do
+      # Hiding it would strand a dashboard they can reach nowhere else.
+      user = PhoenixKitDashboards.Fixtures.user_fixture()
+
+      {:ok, mine} =
+        PhoenixKitDashboards.Dashboards.create(%{
+          title: "Mine",
+          scope: "personal",
+          owner_user_uuid: user.uuid
+        })
+
+      {:ok, _} = Placements.put_personal(mine, "core.admin_home")
+      Process.delete({Slots, :personal_slots, user.uuid})
+
+      refute Slots.slot_tab_visible?("core.admin_home", nil)
+      assert Slots.slot_tab_visible?("core.admin_home", Scope.for_user(user))
+    end
+
+    test "an unknown slot key is simply not visible" do
+      refute Slots.slot_tab_visible?("nope.not_a_slot", nil)
     end
   end
 

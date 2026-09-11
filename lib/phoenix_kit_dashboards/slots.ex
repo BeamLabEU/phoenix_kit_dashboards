@@ -28,8 +28,11 @@ defmodule PhoenixKitDashboards.Slots do
   require Logger
 
   alias PhoenixKit.Users.Auth.Scope
+  alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Paths
+  alias PhoenixKitDashboards.Placements
   alias PhoenixKitDashboards.Slot
+  alias PhoenixKitDashboards.Web.Helpers
 
   @pt_key {__MODULE__, :catalog}
   @provider_callback :phoenix_kit_dashboard_slots
@@ -200,19 +203,43 @@ defmodule PhoenixKitDashboards.Slots do
   # permission check — no dashboard loads, no per-slot queries.
   @spec slot_tab_visible?(String.t(), map() | nil) :: boolean()
   def slot_tab_visible?(slot_key, scope) do
-    PhoenixKitDashboards.Placements.any_for_slot?(slot_key) or can_manage?(scope)
+    Placements.any_for_slot?(slot_key) or personal_here?(slot_key, scope)
   rescue
     # Never hide a tab because a check blew up — an unexpectedly missing tab is
     # harder to diagnose than an empty one.
     _ -> true
   end
 
-  defp can_manage?(nil), do: false
+  # A shared placement is a cached settings read, but a PERSONAL one lives on
+  # the person's own dashboard rows. Someone whose only board here is their own
+  # must still get the tab — hiding it would strand a dashboard they can reach
+  # nowhere else — so the query happens, memoized per process for the render so
+  # a sidebar with several slots costs one lookup rather than one each.
+  defp personal_here?(slot_key, scope) do
+    case Helpers.scope_actor_uuid(scope) do
+      nil -> false
+      uuid -> slot_key in personal_slots(uuid)
+    end
+  end
 
-  defp can_manage?(scope) do
-    Code.ensure_loaded?(Scope) and Scope.has_module_access?(scope, "dashboards")
+  defp personal_slots(user_uuid) do
+    case Process.get({__MODULE__, :personal_slots, user_uuid}) do
+      nil ->
+        slots =
+          user_uuid
+          |> Dashboards.list_for_user([])
+          |> Enum.filter(&(&1.scope == "personal" and &1.owner_user_uuid == user_uuid))
+          |> Enum.map(&Placements.slot_of/1)
+          |> Enum.reject(&is_nil/1)
+
+        Process.put({__MODULE__, :personal_slots, user_uuid}, slots)
+        slots
+
+      slots ->
+        slots
+    end
   rescue
-    _ -> false
+    _ -> []
   end
 
   @doc """
