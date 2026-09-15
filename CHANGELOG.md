@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **`phoenix_kit_dashboards`' future shape now belongs to a module-owned
+  migration chain**, `PhoenixKitDashboards.Migrations`, marker
+  `pkd_schema:<N>`. V1 is an **adoption, not a create**: core's V133/V139
+  baseline still creates the table (and its `config` column) on every
+  install, and V1 re-asserts that exact shape idempotently and stamps the
+  marker. Because no shape changes, core's `ExpectedSchema` stays accurate —
+  **no core release is required and there is no release-ordering hazard**.
+
+  **`down/1` can never drop the table.** It unstamps the marker and nothing
+  else: the rows are every user's saved dashboard layouts, and on most
+  installs the table is core-created. Test-pinned — no statement in either
+  direction may match `DROP`/`TRUNCATE`/`DELETE`.
+
+  Existing hosts: upgrade, then `mix phoenix_kit.update`; it generates a
+  `dashboards_update_v00_to_v01.exs` migration that stamps `pkd_schema:1` and
+  nothing else changes. New hosts and hosts without this module: unchanged.
+
+  This is the first of a planned series of similar module-owned-migration
+  adoptions across `phoenix_kit_*` packages that today rely entirely on
+  core's versioned chain for their own tables.
+
 ## 0.5.0 - 2026-09-11
 
 ### Added

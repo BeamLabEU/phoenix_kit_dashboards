@@ -30,9 +30,12 @@ Add to your PhoenixKit host app's `mix.exs`:
 {:phoenix_kit_dashboards, "~> 0.3"}
 ```
 
-Run `mix deps.get`, then apply core's migrations with `mix phoenix_kit.update`.
-The `phoenix_kit_dashboards` table ships as core PhoenixKit migration **V133** —
-modules do no DDL of their own, so there is no migration to run from this package.
+Run `mix deps.get`, then apply migrations with `mix phoenix_kit.update`. The
+`phoenix_kit_dashboards` table was originally created by core PhoenixKit
+migrations **V133**/**V139**; its future shape is now owned by this package's
+own migration chain (`PhoenixKitDashboards.Migrations`, marker
+`pkd_schema:<N>`), which `mix phoenix_kit.update` discovers and runs
+alongside core's.
 
 The module auto-discovers — a **Dashboards** tab appears in the admin sidebar.
 

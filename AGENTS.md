@@ -28,7 +28,9 @@ personal / system / role.
 
 ## What this module does NOT do
 
-- **No migrations or DDL of its own** — see "Database & migrations".
+- **No DDL of its own beyond adopting `phoenix_kit_dashboards`' existing
+  shape** — see "Database & migrations". `PhoenixKitDashboards.Migrations`
+  owns that table's FUTURE shape; it does not create any OTHER table.
 - **No Ecto repo** — DB access goes through `PhoenixKit.RepoHelper.repo/0`.
 - **No `route_module/0`** — every page is an `admin_tabs/0` entry with
   `live_view:` set (single-page pattern, like `phoenix_kit_locations` /
@@ -225,6 +227,7 @@ Repo-local aliases:
 ```
 lib/phoenix_kit_dashboards.ex          # PhoenixKit.Module callbacks + both provider contracts
 lib/phoenix_kit_dashboards/
+  migrations.ex                        # module-owned migration chain (pkd_schema:<N> marker)
   dashboards.ex                        # context: CRUD, placement, live sync, optimistic lock
   schemas/dashboard.ex                 # the phoenix_kit_dashboards schema (JSONB layout + config)
   widget.ex                            # widget TYPE struct + from_map/2 normalization
@@ -385,9 +388,29 @@ the host's PubSub; broadcast failures never crash a mutation.
 
 ## Database & migrations
 
-None. The `phoenix_kit_dashboards` table and its `config` column ship in
-**core's** versioned chain; `migration_module/0` is unset and this module writes
-no DDL. A schema change is a core migration first, then schema edits here.
+`phoenix_kit_dashboards` (the table) and its `config` column were originally
+created by **core's** versioned chain (`V133`/`V139`). Its FUTURE shape is now
+owned by this module's own migration chain,
+`PhoenixKitDashboards.Migrations` (`migration_module/0`), the same
+decentralized-migrations protocol `phoenix_kit_billing` and `phoenix_kit_legal`
+use over their own core-created tables. The chain version is tracked as a
+`pkd_schema:<N>` `COMMENT ON TABLE` marker; a marker-less table reads as
+version 0.
+
+V1 is a pure **adoption** step: it reproduces core's V133/V135/V139 shape
+under core's exact object names (idempotent `CREATE TABLE IF NOT EXISTS` /
+`ADD COLUMN IF NOT EXISTS` / guarded `DO $$ ... $$` constraint blocks), so on
+every existing install it changes nothing except stamping the marker. Because
+it changes no shape, core's `ExpectedSchema` manifest stays accurate and no
+core release was required to ship it.
+
+**A table-shape change to `phoenix_kit_dashboards` is a new version in this
+chain from now on — never a new core migration.** `down/1` NEVER drops the
+table or its data; rolling this chain back only unstamps (or re-stamps) the
+marker. A host picks up a pending version the next time it runs `mix
+phoenix_kit.update`, which generates its own
+`dashboards_update_v00_to_v01.exs` migration file.
+
 Table-backed schemas use UUIDv7 primary keys and `use PhoenixKit.SchemaPrefix`,
 and all DB access goes through `PhoenixKit.RepoHelper.repo/0`.
 
