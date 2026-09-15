@@ -391,12 +391,12 @@ defmodule PhoenixKitDashboards.Migrations do
 
   defp validate_target!(_target), do: :ok
 
-  # The prefix rules are CORE's, borrowed rather than restated. This chain
-  # embeds the prefix directly into index NAMES, and Postgres silently
-  # TRUNCATES an identifier past 63 bytes instead of rejecting it — so a
-  # prefix core would refuse produces index names that differ from core's
-  # while every command still exits 0, breaking the one contract adoption
-  # rests on: core's exact object names.
+  # The prefix rules are CORE's, borrowed rather than restated — this V1
+  # does not embed the prefix into any object NAME of its own (every
+  # statement above reaches its table only through `Helpers.qualify_table/2`,
+  # a schema-qualified reference, never a mangled identifier), so the
+  # fallback below exists purely so a prefix behaves identically whether or
+  # not the shared validator happens to be loaded.
   # `Code.ensure_loaded?` before `function_exported?`: the latter answers
   # false for a module that simply has not been loaded yet, which under a
   # release (and in `mix run --no-start`) is the normal state — the check
@@ -407,8 +407,12 @@ defmodule PhoenixKitDashboards.Migrations do
     else
       # Older core without the shared validator: apply core's documented
       # rules here rather than restating a looser local copy that could
-      # drift — lower-case identifiers only, capped at 20 bytes (measured
-      # from the longest embedded object name, 63 - 1 - 42).
+      # drift — lower-case identifiers only, capped at 20 bytes. That cap is
+      # CORE's own `@max_prefix_bytes` (`63 - 1 - 42`), where 42 is the
+      # longest prefix-embedded object name across CORE's entire chain
+      # (e.g. `phoenix_kit_user_role_assignments_uuid_idx`, tracked by
+      # core's own `dev_docs/squash/verify.exs`) — nothing to do with this
+      # module's own object names, which are never prefix-mangled.
       unless is_binary(prefix) and prefix =~ ~r/^[a-z_][a-z0-9_]*$/ and byte_size(prefix) <= 20 do
         raise ArgumentError, "invalid schema prefix: #{inspect(prefix)}"
       end
