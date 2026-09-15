@@ -19,8 +19,10 @@ defmodule PhoenixKitDashboards do
     module-stats), exposed via `phoenix_kit_widgets/0` like any other provider.
   - `PhoenixKitDashboards.Schemas.Dashboard` + `PhoenixKitDashboards.Dashboards` —
     the dashboard schema (JSONB `layout`) and its context. The backing table
-    (`phoenix_kit_dashboards`) is created by core's versioned migration `V133` —
-    modules do no DDL of their own.
+    (`phoenix_kit_dashboards`) was originally created by core's versioned
+    migrations `V133`/`V139`; its future shape is now owned by this module's
+    own migration chain (`PhoenixKitDashboards.Migrations`, marker
+    `pkd_schema:<N>`) — see `migration_module/0`.
   - `PhoenixKitDashboards.Web.*` — the manage + builder LiveViews.
 
   ## Exposing widgets from another module
@@ -89,6 +91,12 @@ defmodule PhoenixKitDashboards do
 
   @impl PhoenixKit.Module
   def version, do: @version
+
+  # phoenix_kit_dashboards' future shape now belongs to this chain — see
+  # PhoenixKitDashboards.Migrations. Core's V133/V139 still create the
+  # V1-adopted shape on every install; nothing else changes.
+  @impl PhoenixKit.Module
+  def migration_module, do: PhoenixKitDashboards.Migrations
 
   @impl PhoenixKit.Module
   def permission_metadata do

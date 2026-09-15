@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **`phoenix_kit_dashboards`' future shape now belongs to a module-owned
+  migration chain**, `PhoenixKitDashboards.Migrations`, marker
+  `pkd_schema:<N>`, following the canonical dual-reader protocol
+  documented by `phoenix_kit_hello_world` and used by `phoenix_kit_boards`/
+  `phoenix_kit_web_analytics` (`migrated_version/1` for migration context,
+  `migrated_version_runtime/1` for `mix phoenix_kit.update`; `up/1` re-reads
+  the version before changing anything). Widths (`title`/`slug`/`scope`) are
+  sourced from `PhoenixKitDashboards.Schemas.Dashboard.column_widths/0` — the
+  single shape authority — never restated as a second number.
+
+  Ownership unfolds in three phases:
+
+    * **Phase 0 (this release)** — V1 is an **adoption, not a create**:
+      core's V133/V139 baseline still creates the table (and its `config`
+      column) on every install, and V1 re-asserts that exact shape
+      idempotently and stamps the marker. Because no shape changes, core's
+      `ExpectedSchema` stays accurate — **no core release is required and
+      there is no release-ordering hazard**.
+    * **Phase 1 (a future V2+)** — the first real shape change requires
+      first adding the altered objects to core's manifest generator's
+      `@excluded_exact` and regenerating `ExpectedSchema`, then raising this
+      package's core floor to that release.
+    * **Phase 2 (a future core baseline squash)** — once core stops creating
+      this table for fresh installs, V1's `CREATE TABLE` becomes the only
+      thing that ever creates it from scratch, which is why `up/1` already
+      ensures `uuid_generate_v7()` (and its `pgcrypto` extension) exist
+      rather than assuming core's chain provided them.
+
+  **`down/1` can never drop the table, for any target including 0.** It
+  unstamps (or re-stamps) the marker and nothing else: the rows are every
+  user's saved dashboard layouts, and on most installs the table is
+  core-created. Test-pinned — no statement in either direction may match
+  `DROP`/`TRUNCATE`/`DELETE`. There is deliberately no automated uninstall
+  path; README.md's new "Removing this module" section gives the operator
+  manual SQL instead.
+
+  Existing hosts: upgrade, then `mix phoenix_kit.update`; it generates a
+  `dashboards_update_v00_to_v01.exs` migration that stamps `pkd_schema:1` and
+  nothing else changes. New hosts and hosts without this module: unchanged.
+
+  This is the first of a planned series of similar module-owned-migration
+  adoptions across `phoenix_kit_*` packages that today rely entirely on
+  core's versioned chain for their own tables.
+
 ## 0.5.0 - 2026-09-11
 
 ### Added

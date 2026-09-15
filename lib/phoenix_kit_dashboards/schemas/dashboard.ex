@@ -43,6 +43,12 @@ defmodule PhoenixKitDashboards.Schemas.Dashboard do
 
   @scopes ~w(personal system role)
 
+  # Single shape authority for `PhoenixKitDashboards.Migrations` — these widths
+  # coincide with core's V133 baseline shape, which `ExpectedSchema` audits;
+  # changing one is a chain version (V2+), never a second hard-coded number in
+  # the migration DDL (mirrors `ConsentLog.column_widths/0` in phoenix_kit_legal).
+  @column_widths %{title: 255, slug: 255, scope: 20}
+
   # A dashboard's TYPE is fixed at creation: "grid" (screenful lattice) or
   # "pixel" (a free-placement canvas). Replaces the old per-dashboard "mode"
   # toggle; legacy `config["mode"]` ("grid"/"free") maps to it.
@@ -79,6 +85,15 @@ defmodule PhoenixKitDashboards.Schemas.Dashboard do
 
     timestamps(type: :utc_datetime)
   end
+
+  @doc """
+  The `character varying(N)` widths `PhoenixKitDashboards.Migrations` builds
+  its `CREATE TABLE`/`ADD COLUMN` DDL from — the single source of truth so the
+  migration chain, this schema, and core's `ExpectedSchema` manifest can never
+  independently disagree on a number.
+  """
+  @spec column_widths() :: %{atom() => pos_integer()}
+  def column_widths, do: @column_widths
 
   @doc "Changeset for creating / updating a dashboard's metadata."
   @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()

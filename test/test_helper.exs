@@ -63,9 +63,15 @@ repo_available =
     try do
       {:ok, _} = PhoenixKitDashboards.Test.Repo.start_link()
 
-      # Build the schema by running core's versioned migrations directly
-      # (phoenix_kit_dashboards ships as core V133 — no module-owned DDL).
+      # Build the schema by running core's versioned migrations first (core
+      # still creates phoenix_kit_dashboards' V133/V139 baseline shape), then
+      # this module's own chain on top — same call the host app makes via
+      # `mix phoenix_kit.update`. `up/1` needs an `Ecto.Migrator` runner, so
+      # the statements are executed as data via `up_statements/2` directly.
       PhoenixKit.Migration.ensure_current(PhoenixKitDashboards.Test.Repo, log: false)
+
+      PhoenixKitDashboards.Migrations.up_statements()
+      |> Enum.each(&Ecto.Adapters.SQL.query!(PhoenixKitDashboards.Test.Repo, &1, []))
 
       Ecto.Adapters.SQL.Sandbox.mode(PhoenixKitDashboards.Test.Repo, :manual)
       true
