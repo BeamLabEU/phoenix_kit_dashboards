@@ -84,12 +84,12 @@ defmodule PhoenixKitDashboards.MigrationsTest do
       assert Migrations.up_statements("public", Migrations.current_version()) != []
     end
 
-    # This chain embeds the prefix into index NAMES (idx_phoenix_kit_dashboards_*),
-    # and Postgres TRUNCATES an identifier past 63 bytes silently rather than
-    # rejecting it — so a prefix core would refuse yields index names that
-    # differ from core's while every command still exits 0, breaking the
-    # contract adoption rests on. The rules are therefore core's, and this
-    # test compares against core rather than restating them.
+    # The prefix is interpolated into every statement (as a schema qualifier
+    # and inside the DO blocks' string literals), so it must be validated
+    # before it reaches SQL. This chain embeds it into no object NAME, but a
+    # prefix core would refuse is still one core's own chain never created
+    # this table under — the rules are therefore core's, and this test
+    # compares against core rather than restating them.
     test "every public builder that emits SQL validates its own prefix" do
       for fun <- [:up_statements, :down_statements] do
         assert_raise ArgumentError, fn -> apply(Migrations, fun, ["EVIL\";DROP"]) end
@@ -189,9 +189,6 @@ defmodule PhoenixKitDashboards.MigrationsTest do
              "the marker must be stamped after the DDL it certifies, not before"
     end
 
-    # `up/1` and `down/1` accept a map as well as a keyword list, because
-    # `validated_prefix/1` does. A shape the function ACCEPTS must not
-    # silently lose `:version`.
     test "applying up to version 0 is not an operation" do
       assert Migrations.up_statements("public", 0) == []
       assert Migrations.up_statements("dashboards_alt", 0) == []

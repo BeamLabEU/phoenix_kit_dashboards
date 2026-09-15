@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.6.0 - 2026-09-15
 
 ### Changed
 
@@ -52,6 +52,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   This is the first of a planned series of similar module-owned-migration
   adoptions across `phoenix_kit_*` packages that today rely entirely on
   core's versioned chain for their own tables.
+
+### Fixed
+
+- **README "Removing this module" no longer promises what core undoes.**
+  While core still owns this table's creation, its `ExpectedSchema` marks the
+  table required, so `mix phoenix_kit.repair` recreates a dropped
+  `phoenix_kit_dashboards` (empty). The guide now says so, qualifies the SQL
+  with the schema prefix, and drops the "clear the marker to stop tracking"
+  advice — the next `mix phoenix_kit.update` simply re-stamps it.
+- Corrected core-version citations (every adopted index/constraint is core
+  V133, not V135) and two misleading comments in the migration tests.
+- `migrated_version_runtime/1` is now covered against a real database for a
+  foreign table comment, malformed `pkd_schema:` markers, an absent table,
+  and an invalid prefix (re-raised, never reported as 0).
 
 ## 0.5.0 - 2026-09-11
 

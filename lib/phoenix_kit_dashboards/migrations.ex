@@ -194,7 +194,7 @@ defmodule PhoenixKitDashboards.Migrations do
   @doc """
   The SQL `up/1` executes, as data — the testable single source. The
   ownership test parses these statements to prove that the object names
-  are core's V135/V139 names, that the `CREATE TABLE` stays shape-identical
+  are core's V133 names, that the `CREATE TABLE` stays shape-identical
   to core's `ExpectedSchema` manifest, that every width is
   `Dashboard.column_widths/0`, and that nothing here can drop the table.
 

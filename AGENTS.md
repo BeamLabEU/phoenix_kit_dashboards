@@ -406,7 +406,7 @@ widths are sourced from `PhoenixKitDashboards.Schemas.Dashboard.column_widths/0`
 
 Ownership unfolds in three phases (see the moduledoc for the full account):
 **Phase 0** (this V1) is a pure **adoption** — it reproduces core's
-V133/V135/V139 shape under core's exact object names (idempotent `CREATE
+V133/V139 shape under core's exact object names (idempotent `CREATE
 TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` / guarded `DO $$ ... $$`
 constraint blocks), so on every existing install it changes nothing except
 stamping the marker; because it changes no shape, core's `ExpectedSchema`

@@ -48,20 +48,25 @@ consented to deleting every user's saved dashboards, and a migration whose
 result depended on which packages happen to be compiled in would be
 nondeterministic (it would break core's manifest, chain hash, and squash
 verification). Removing the data is therefore a deliberate, manual operator
-step:
+step — remove `:phoenix_kit_dashboards` from `mix.exs` first, then run
+(substituting your PhoenixKit schema prefix for `public`):
 
 ```sql
--- Only after removing :phoenix_kit_dashboards from mix.exs, and only if you
--- actually want every dashboard (personal, system, and role) gone for good.
-DROP TABLE phoenix_kit_dashboards;
+-- Only if you actually want every dashboard (personal, system, and role)
+-- gone for good.
+DROP TABLE public.phoenix_kit_dashboards;
 ```
 
-If you want to keep the table (e.g. you plan to reinstall the module later)
-but stop this chain from tracking it, clear the version marker instead:
+While core's baseline still creates this table (it does today), core's
+`ExpectedSchema` manifest lists it as required: `mix phoenix_kit.doctor` then
+reports it missing, and `mix phoenix_kit.repair` recreates it — **empty**. The
+rows are gone either way; only the empty table comes back.
 
-```sql
-COMMENT ON TABLE phoenix_kit_dashboards IS NULL;
-```
+To keep the rows (e.g. you plan to reinstall the module later), simply leave
+the table alone. The `pkd_schema:<N>` marker is inert once the module is gone,
+and on reinstall it correctly reads as already adopted. Clearing it achieves
+nothing: while the module is installed, the next `mix phoenix_kit.update`
+re-stamps it.
 
 ## Routes
 
