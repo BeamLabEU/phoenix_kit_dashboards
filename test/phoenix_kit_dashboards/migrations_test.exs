@@ -40,6 +40,30 @@ defmodule PhoenixKitDashboards.MigrationsTest do
       assert Migrations.version_table() == "phoenix_kit_dashboards"
     end
 
+    test "initial_version/0" do
+      assert Migrations.initial_version() == 1
+    end
+
+    # `mix phoenix_kit_hello_world.audit_migrations` (the canonical auditor
+    # for this protocol) refuses to drive a coordinator missing any of these
+    # five — `mix phoenix_kit.update` itself only calls
+    # `migrated_version_runtime/1` + `current_version/0`, but `up/1` needs
+    # `migrated_version/1` to re-read the version it is about to change.
+    test "exports the full five-function protocol, plus version_table/0 and initial_version/0" do
+      for {fun, arity} <- [
+            {:current_version, 0},
+            {:up, 1},
+            {:down, 1},
+            {:migrated_version, 1},
+            {:migrated_version_runtime, 1},
+            {:version_table, 0},
+            {:initial_version, 0}
+          ] do
+        assert function_exported?(Migrations, fun, arity),
+               "#{inspect(Migrations)} does not export #{fun}/#{arity}"
+      end
+    end
+
     # The marker decides whether any LATER version ever runs: core's
     # `classify/2` reads it and answers `:up_to_date` for every version at or
     # below it. Stamping a version this chain does not have therefore skips
@@ -396,11 +420,11 @@ defmodule PhoenixKitDashboards.MigrationsTest do
     test "each direction executes its own builder" do
       source = File.read!(@source)
 
-      assert source =~ ~r/up_statements\(target\)\s*\|>\s*Enum\.each\(&execute\/1\)/,
+      assert source =~ ~r/up_statements\(opts\.version\)\s*\|>\s*Enum\.each\(&execute\/1\)/,
              "up/1 no longer pipes up_statements/2 into execute/1 — whatever it " <>
                "runs instead is not what the up_statements-based tests above check"
 
-      assert source =~ ~r/down_statements\(target\)\s*\|>\s*Enum\.each\(&execute\/1\)/,
+      assert source =~ ~r/down_statements\(opts\.version\)\s*\|>\s*Enum\.each\(&execute\/1\)/,
              "down/1 no longer pipes down_statements/2 into execute/1 — whatever it " <>
                "runs instead is not what `down/1 emits exactly the marker " <>
                "bookkeeping` checks"
@@ -425,6 +449,33 @@ defmodule PhoenixKitDashboards.MigrationsTest do
 
   describe "V1 stays aligned with core's manifest (while core audits the table)" do
     alias PhoenixKit.Migrations.ExpectedSchema
+    alias PhoenixKitDashboards.Schemas.Dashboard
+
+    # The lesson phoenix_kit_legal paid for once (three disagreeing DDLs of
+    # one table): never a second copy of a width. Parsed back out of the
+    # CREATE rather than trusted, so a hard-coded number slipped into
+    # up_statements/2 instead of Dashboard.column_widths/0 fails here even
+    # though the two happen to agree today.
+    test "every varchar width in the CREATE is Dashboard.column_widths/0" do
+      [create | _] = Migrations.up_statements("public", 1)
+
+      parsed =
+        ~r/"(\w+)" character varying\((\d+)\)/
+        |> Regex.scan(create)
+        |> Map.new(fn [_, col, width] ->
+          {String.to_existing_atom(col), String.to_integer(width)}
+        end)
+
+      assert parsed == Dashboard.column_widths(),
+             """
+             The CREATE TABLE widths and Dashboard.column_widths/0 disagree.
+
+             parsed from DDL: #{inspect(parsed)}
+             declared:        #{inspect(Dashboard.column_widths())}
+
+             up_statements/2 must interpolate column_widths/0 — never restate a number.
+             """
+    end
 
     # Core's V133/V139 baseline still creates this table and core's
     # ExpectedSchema audits that shape, so until the first shape-changing

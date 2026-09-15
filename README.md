@@ -39,6 +39,30 @@ alongside core's.
 
 The module auto-discovers — a **Dashboards** tab appears in the admin sidebar.
 
+### Removing this module
+
+There is deliberately **no automated uninstall**. `PhoenixKitDashboards.Migrations.down/1`
+never drops `phoenix_kit_dashboards` or any row in it, for any target
+version — a host that merely removes this dependency from `mix.exs` has not
+consented to deleting every user's saved dashboards, and a migration whose
+result depended on which packages happen to be compiled in would be
+nondeterministic (it would break core's manifest, chain hash, and squash
+verification). Removing the data is therefore a deliberate, manual operator
+step:
+
+```sql
+-- Only after removing :phoenix_kit_dashboards from mix.exs, and only if you
+-- actually want every dashboard (personal, system, and role) gone for good.
+DROP TABLE phoenix_kit_dashboards;
+```
+
+If you want to keep the table (e.g. you plan to reinstall the module later)
+but stop this chain from tracking it, clear the version marker instead:
+
+```sql
+COMMENT ON TABLE phoenix_kit_dashboards IS NULL;
+```
+
 ## Routes
 
 | Path | LiveView | Purpose |

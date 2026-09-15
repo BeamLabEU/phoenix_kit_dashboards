@@ -391,23 +391,42 @@ the host's PubSub; broadcast failures never crash a mutation.
 `phoenix_kit_dashboards` (the table) and its `config` column were originally
 created by **core's** versioned chain (`V133`/`V139`). Its FUTURE shape is now
 owned by this module's own migration chain,
-`PhoenixKitDashboards.Migrations` (`migration_module/0`), the same
-decentralized-migrations protocol `phoenix_kit_billing` and `phoenix_kit_legal`
-use over their own core-created tables. The chain version is tracked as a
-`pkd_schema:<N>` `COMMENT ON TABLE` marker; a marker-less table reads as
-version 0.
+`PhoenixKitDashboards.Migrations` (`migration_module/0`), following the
+canonical dual-reader protocol `phoenix_kit_hello_world` documents and
+`phoenix_kit_boards`/`phoenix_kit_web_analytics` run in production —
+`migrated_version/1` (migration context, via `Ecto.Migration`'s `repo()`, no
+rescue) and `migrated_version_runtime/1` (the one `mix phoenix_kit.update`
+calls, via `PhoenixKit.RepoHelper.repo()`, rescues to `0` except an invalid
+prefix, which re-raises); `up/1` re-reads the version through
+`migrated_version/1` before changing anything. The chain version is tracked
+as a `pkd_schema:<N>` `COMMENT ON TABLE` marker; a marker-less table, or one
+carrying a foreign (non-`pkd_schema:`) comment, reads as version 0. Varchar
+widths are sourced from `PhoenixKitDashboards.Schemas.Dashboard.column_widths/0`
+— never a second hard-coded number in the migration DDL.
 
-V1 is a pure **adoption** step: it reproduces core's V133/V135/V139 shape
-under core's exact object names (idempotent `CREATE TABLE IF NOT EXISTS` /
-`ADD COLUMN IF NOT EXISTS` / guarded `DO $$ ... $$` constraint blocks), so on
-every existing install it changes nothing except stamping the marker. Because
-it changes no shape, core's `ExpectedSchema` manifest stays accurate and no
-core release was required to ship it.
+Ownership unfolds in three phases (see the moduledoc for the full account):
+**Phase 0** (this V1) is a pure **adoption** — it reproduces core's
+V133/V135/V139 shape under core's exact object names (idempotent `CREATE
+TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` / guarded `DO $$ ... $$`
+constraint blocks), so on every existing install it changes nothing except
+stamping the marker; because it changes no shape, core's `ExpectedSchema`
+manifest stays accurate and no core release was required to ship it.
+**Phase 1** is the first real shape change (a future V2+) — it requires
+first adding the altered objects to core's manifest generator's
+`@excluded_exact` and regenerating `ExpectedSchema`, then raising this
+package's core floor. **Phase 2** is a future core baseline squash that
+drops this table from core's own chain entirely — V1's `CREATE TABLE` is
+therefore already a fully self-sufficient definition (it calls
+`Helpers.ensure_extension!/1` + `Helpers.ensure_uuid_v7_function/1` rather
+than assuming core's chain provided them), not merely a shape-matching
+no-op for an already-existing table.
 
 **A table-shape change to `phoenix_kit_dashboards` is a new version in this
 chain from now on — never a new core migration.** `down/1` NEVER drops the
-table or its data; rolling this chain back only unstamps (or re-stamps) the
-marker. A host picks up a pending version the next time it runs `mix
+table or its data, for any target including `0`; rolling this chain back
+only unstamps (or re-stamps) the marker. There is deliberately no automated
+uninstall path — README.md's "Removing this module" section has the manual
+operator SQL. A host picks up a pending version the next time it runs `mix
 phoenix_kit.update`, which generates its own
 `dashboards_update_v00_to_v01.exs` migration file.
 
