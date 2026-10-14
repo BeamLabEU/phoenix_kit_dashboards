@@ -4,6 +4,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveSyncTest do
   use PhoenixKitDashboards.LiveCase, async: false
 
   alias PhoenixKitDashboards.Dashboards
+  alias PhoenixKitDashboards.Paths
 
   setup do
     start_supervised!({Phoenix.PubSub, name: PhoenixKit.PubSub})
@@ -47,6 +48,6 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveSyncTest do
     {:ok, _} = Dashboards.delete(Dashboards.get(dashboard.uuid))
 
     # The broadcast redirects the still-open session to the manage page.
-    assert_redirect(tv, "/en/admin/dashboards")
+    assert_redirect(tv, Paths.index())
   end
 end

@@ -54,10 +54,27 @@ defmodule PhoenixKitDashboards.MixProject do
         "ecto.create --quiet -r PhoenixKitDashboards.Test.Repo"
       ],
       "test.reset": [
+        &guard_shared_test_db/1,
         "ecto.drop --quiet -r PhoenixKitDashboards.Test.Repo",
         "test.setup"
       ]
     ]
+  end
+
+  # `PGDATABASE` points the suite at a database the test role does not own (see
+  # config/test.exs), and `ecto.drop` follows it — so a reset would drop a
+  # shared database other modules are using.
+  defp guard_shared_test_db(_args) do
+    case System.get_env("PGDATABASE") do
+      value when is_binary(value) and value != "" ->
+        Mix.raise("""
+        test.reset refuses to run with PGDATABASE=#{value}: it would DROP that database.
+        Unset PGDATABASE to reset the module's own test database, or reset the shared one by hand.
+        """)
+
+      _ ->
+        :ok
+    end
   end
 
   # phoenix_kit deps resolve from Hex by default. For cross-repo work against a

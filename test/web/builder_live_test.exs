@@ -4,6 +4,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveTest do
   alias PhoenixKit.Users.Roles
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Layout
+  alias PhoenixKitDashboards.Paths
 
   defp sign_in(conn) do
     user = user_fixture()
@@ -57,7 +58,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveTest do
       assert {:error, {:live_redirect, %{to: to, flash: flash}}} =
                live(conn, "/en/admin/dashboards/#{Ecto.UUID.generate()}")
 
-      assert to == "/en/admin/dashboards"
+      assert to == Paths.index()
       assert flash["error"] =~ "Dashboard not found."
     end
 
@@ -69,7 +70,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveTest do
       assert {:error, {:live_redirect, %{to: to, flash: flash}}} =
                live(conn, "/en/admin/dashboards/#{foreign.uuid}")
 
-      assert to == "/en/admin/dashboards"
+      assert to == Paths.index()
       assert flash["error"] =~ "do not have access"
     end
   end
@@ -562,7 +563,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveTest do
       view
       |> form("form[phx-submit='save_settings']", %{
         "view" => "compact",
-        "settings" => %{"module_key" => "jobs"}
+        "settings" => %{"module_key" => "dashboards"}
       })
       |> render_submit()
 
@@ -570,7 +571,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLiveTest do
       # layout's placement (designing the phone layout = choosing how widgets
       # look on the phone), never on the instance default.
       [inst] = Dashboards.get(dashboard.uuid).layout
-      assert %{"settings" => %{"module_key" => "jobs"}} = inst
+      assert %{"settings" => %{"module_key" => "dashboards"}} = inst
       assert Layout.view(inst, "l1") == "compact"
       # The instance default (seeded at add time) is untouched.
       assert inst["view"] == "detailed"

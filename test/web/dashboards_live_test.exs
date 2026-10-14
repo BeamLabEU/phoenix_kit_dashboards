@@ -2,8 +2,18 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
   use PhoenixKitDashboards.LiveCase
 
   alias PhoenixKitDashboards.Dashboards
+  alias PhoenixKitDashboards.Paths
   alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Web.Helpers
+
+  # Redirect targets come from `Paths`, which follows core's locale rule (the
+  # primary locale is prefixless on current core), so a literal `/en/...` would
+  # pin the suite to one core release.
+  defp uuid_from(to) do
+    prefix = Paths.index() <> "/"
+    assert String.starts_with?(to, prefix)
+    String.replace_prefix(to, prefix, "")
+  end
 
   defp sign_in(conn) do
     user = user_fixture()
@@ -36,7 +46,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
 
       # The old create modal is gone — creating happens on its own page.
       refute html =~ "dashboard-create-modal"
-      assert html =~ "/en/admin/dashboards/new"
+      assert html =~ Paths.new()
     end
 
     test "the form page creates a dashboard and live-redirects to its builder", %{conn: conn} do
@@ -47,7 +57,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
       {:error, {:live_redirect, %{to: to}}} =
         view |> form("#dashboard-form", %{"title" => "Fresh Board"}) |> render_submit()
 
-      assert to =~ "/en/admin/dashboards/"
+      assert to =~ Paths.index() <> "/"
 
       assert [%{title: "Fresh Board"}] = Dashboards.list_for_user(user.uuid)
       assert_activity_logged("dashboard.created", actor_uuid: user.uuid)
@@ -64,7 +74,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
         |> form("#dashboard-form", %{"title" => "Canvas One", "type" => "pixel"})
         |> render_submit()
 
-      "/en/admin/dashboards/" <> uuid = to
+      uuid = uuid_from(to)
       assert Dashboards.get(uuid).config["type"] == "pixel"
       assert Dashboard.type(Dashboards.get(uuid)) == "pixel"
     end
@@ -85,7 +95,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
         |> form("#dashboard-form", %{"title" => "After", "scope" => "system"})
         |> render_submit()
 
-      assert to =~ "/en/admin/dashboards"
+      assert to =~ Paths.index()
       updated = Dashboards.get(dashboard.uuid)
       assert updated.title == "After"
       assert updated.scope == "system"
@@ -101,7 +111,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
       assert {:error, {:live_redirect, %{to: to}}} =
                live(conn, "/en/admin/dashboards/#{foreign.uuid}/edit")
 
-      assert to =~ "/en/admin/dashboards"
+      assert to =~ Paths.index()
     end
   end
 
@@ -115,7 +125,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
         |> form("#dashboard-form", %{"title" => "Team Board", "scope" => "system"})
         |> render_submit()
 
-      "/en/admin/dashboards/" <> uuid = to
+      uuid = uuid_from(to)
       dashboard = Dashboards.get(uuid)
       assert dashboard.scope == "system"
       assert dashboard.owner_user_uuid == nil
@@ -146,7 +156,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
           "role_uuid" => role_uuid
         })
 
-      "/en/admin/dashboards/" <> uuid = to
+      uuid = uuid_from(to)
       dashboard = Dashboards.get(uuid)
       assert dashboard.scope == "role"
       assert dashboard.role_uuid == role_uuid
@@ -167,7 +177,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
           "role_uuid" => Ecto.UUID.generate()
         })
 
-      "/en/admin/dashboards/" <> uuid = to
+      uuid = uuid_from(to)
       dashboard = Dashboards.get(uuid)
 
       assert dashboard.scope == "personal"
@@ -188,7 +198,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
         |> element("button[phx-click='clone'][phx-value-uuid='#{shared.uuid}']")
         |> render_click()
 
-      "/en/admin/dashboards/" <> uuid = to
+      uuid = uuid_from(to)
       clone = Dashboards.get(uuid)
       assert clone.scope == "personal"
       assert clone.owner_user_uuid == user.uuid

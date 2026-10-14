@@ -24,9 +24,8 @@ db_name =
   Application.get_env(:phoenix_kit_dashboards, PhoenixKitDashboards.Test.Repo)[:database] ||
     "phoenix_kit_dashboards_test"
 
-# The preflight ships in core, and this module's core floor (`~> 2.0`)
-# predates it — so it is used when the running core has it, and otherwise
-# this falls through to exactly the previous behaviour.
+# The preflight ships in core and is used when the running core has it; a
+# core without it falls through to attempting the connection unclassified.
 db_check =
   if Code.ensure_loaded?(PhoenixKit.TestSupport.PostgresPreflight) do
     # One classified connection attempt, with the repo's OWN credentials and

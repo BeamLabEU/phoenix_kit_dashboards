@@ -72,8 +72,8 @@ defmodule PhoenixKitDashboards.CorePinConformanceTest do
            "the requirement must admit the floor #{@floor} itself"
 
     refute Version.match?("2.37.5", requirement),
-           "core 2.14.9 lacks `Settings.update_setting_with_module/4`, which " <>
-             "`Placements.write/3` calls — every placement write would fail silently"
+           "core 2.37.5 lacks `PhoenixKitWeb.Actor` and `Activity.log/3`, which " <>
+             "the actor threading and every activity log call use — the package would not compile"
   end
 
   # Resolution order matters. `Mix.Project.config()` is exact, but it reports the

@@ -76,7 +76,8 @@ Repo-local aliases:
 
 - `mix quality` — `format` + `credo --strict` + `dialyzer` (applies formatting).
 - `mix quality.ci` — `format --check-formatted` + `credo --strict` + `dialyzer`: it CHECKS formatting rather than applying it, so run `mix format` first.
-- `mix test.reset` — drops the test database and recreates it.
+- `mix test.reset` — drops the test database and recreates it. It refuses to run
+  while `PGDATABASE` is set, since `ecto.drop` would otherwise drop that (shared) database.
 
 ## Conventions
 
