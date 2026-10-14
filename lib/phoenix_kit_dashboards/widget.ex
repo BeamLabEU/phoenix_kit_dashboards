@@ -26,8 +26,9 @@ defmodule PhoenixKitDashboards.Widget do
             icon: "hero-envelope",
             module_key: "emails",
             component: PhoenixKitEmails.Widgets.DeliverabilityLive,
-            default_size: %{w: 6, h: 2},
-            min_size: %{w: 3, h: 1},
+            # Lattice units: 25px nominal cells, a default layout is 64×36.
+            default_size: %{w: 16, h: 8},
+            min_size: %{w: 8, h: 4},
             settings_schema: [
               %{key: "window", type: :select, label: "Window",
                 options: ["7d", "30d", "90d"], default: "30d"}
@@ -38,10 +39,17 @@ defmodule PhoenixKitDashboards.Widget do
 
   `:component` is a `Phoenix.LiveComponent` module. The dashboard host renders it
   with `<.live_component module={w.component} id={instance_id} settings={...}
-  view={...} size={%{w: w, h: h}} scope={...} />` — the selected view key and the
-  instance's current span ride along, so one widget can render several
-  densities/layouts. Each widget owns its own data loading and refresh
-  lifecycle.
+  view={...} size={%{w: w, h: h}} scope={...} context={...} />` — the selected
+  view key and the instance's current span (in lattice cells) ride along, so one
+  widget can render several densities/layouts. Each widget owns its own data
+  loading and refresh lifecycle.
+
+  `context` is what the page is about: a map of context kind to id
+  (`%{"projects.project" => uuid}`), `%{}` on a context-free dashboard. A value
+  is an id, never a struct and never a permission grant — a widget that reads it
+  re-loads and re-authorizes the record against `scope`. Reading it is optional:
+  a settings field that declares the kind (see below) already arrives in
+  `settings` resolved to the id.
 
   ## Settings schema
 
@@ -53,6 +61,12 @@ defmodule PhoenixKitDashboards.Widget do
   Supported `:type` values: `:string`, `:text`, `:number`, `:boolean`, `:select`.
   Select `options` may be plain strings or `{label, value}` tuples (the label is
   translated at render when a translation exists).
+
+  An optional `context: "<kind>"` (e.g. `"projects.project"`) marks the field as
+  holding a context subject of that kind. The field still stores and reads a
+  plain id; declaring the kind lets the host offer "the one this page is about"
+  and "mine" as sources beside a fixed pick, and resolve the choice into the
+  field before render. See `PhoenixKitDashboards.Binds`.
   """
 
   alias PhoenixKitDashboards.Lattice
@@ -101,7 +115,8 @@ defmodule PhoenixKitDashboards.Widget do
           required(:type) => :string | :text | :number | :boolean | :select,
           optional(:label) => String.t(),
           optional(:options) => [String.t() | {String.t(), String.t()}],
-          optional(:default) => term()
+          optional(:default) => term(),
+          optional(:context) => String.t() | nil
         }
 
   @type t :: %__MODULE__{

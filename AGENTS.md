@@ -282,14 +282,19 @@ config instead: `config :phoenix_kit_dashboards, widget_providers: [MyApp.Widget
 | `module_key` | no | Gates the widget on that module's enablement + permission. Absent = always offered. |
 | `default_size` / `min_size` | no | Lattice units. Defaults `%{w: 16, h: 8}` / `%{w: 8, h: 4}`. |
 | `max_size` | no | Accepted but **ignored** — every widget may span the full lattice (160). |
-| `settings_schema` | no | `[%{key, type, label, options, default}]`; types `:string`, `:text`, `:number`, `:boolean`, `:select`. Select `options` may be `{label, value}` tuples. |
+| `settings_schema` | no | `[%{key, type, label, options, default, context}]`; types `:string`, `:text`, `:number`, `:boolean`, `:select`. Select `options` may be `{label, value}` tuples. `context: "<kind>"` marks a field as holding a context subject (see "Slot + placement contracts"). |
 | `views` | no | `[%{key, name, min_size}]` named render variants; a view may raise the size floor (`min_size_for/2`). |
 | `refresh_interval` | no | Milliseconds, floored to 1000. The host runs one `:refresh_tick` loop and `send_update/2`s each due widget — widgets never subscribe or time themselves (a LiveComponent has no process). |
 | `description`, `icon`, `category` | no | Catalog presentation. |
 
 The host renders `<.live_component module={w.component} id={instance_id}
-settings={…} view={…} size={%{w:, h:}} scope={…} />`, so one widget can render
-several densities and degrade when small. Each widget owns its own data loading.
+settings={…} view={…} size={%{w:, h:}} scope={…} context={…} />`, so one widget
+can render several densities and degrade when small. Each widget owns its own
+data loading. `context` is `%{kind => id}` for what the page is about
+(`%{"projects.project" => uuid}`), `%{}` on a context-free dashboard; reading it
+is optional, because a settings field declaring that kind already arrives in
+`settings` resolved to the id. A context id is a selection, not a grant — a
+widget re-authorizes the record against `scope`.
 
 `phoenix_kit_project_extensions/0` is the same style of duck-typed contract in
 the other direction: it offers `phoenix_kit_projects` a read-only **Dashboard**
@@ -441,9 +446,12 @@ by `DataCase`/`LiveCase`, needs PostgreSQL). Without a database the integration
 tag is excluded and the unit tests still run.
 
 Test database `phoenix_kit_dashboards_test` (`mix test.setup` creates it).
-`test/test_helper.exs` requires the `test/support` files explicitly (Elixir 1.19
-no longer auto-loads them), probes for the database with `psql -lqt`, builds the
-schema with `PhoenixKit.Migration.ensure_current/2`, starts
+`test/test_helper.exs` requires the `test/support` files explicitly, checks the
+database with one classified connection attempt through core's
+`PhoenixKit.TestSupport.PostgresPreflight` (the repo's own credentials and
+transport; it prints the reason when it fails), builds the schema with
+`PhoenixKit.Migration.ensure_current/2` followed by this module's own
+`Migrations.up_statements/2`, starts
 `PhoenixKit.PubSub.Manager` + `PhoenixKit.ModuleRegistry`, forces the URL-prefix
 cache to `"/"` so `Paths` matches the test router, and starts the test Endpoint
 only when the database is available.

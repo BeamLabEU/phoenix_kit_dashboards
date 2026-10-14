@@ -18,10 +18,11 @@ defmodule PhoenixKitDashboards.Widgets.NoteWidget do
         view={selected_view}          # nil or a declared view key
         size={%{w: w, h: h}}          # the instance's current span
         scope={@phoenix_kit_current_scope}
+        context={context}             # %{kind => id} for what the page is about; %{} when none
       />
 
-  So a widget component handles the `:settings`, `:view`, `:size`, and `:scope`
-  assigns (all optional to read). It runs inside the host LiveView's process
+  So a widget component handles the `:settings`, `:view`, `:size`, `:scope`, and
+  `:context` assigns (all optional to read). It runs inside the host LiveView's process
   (LiveComponents have no process of their own), so for live data a widget's
   catalog entry declares a `refresh_interval` (ms) and the host re-`send_update/2`s
   it on that cadence — the widget never subscribes/times itself.
