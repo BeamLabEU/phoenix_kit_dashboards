@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0 - 2026-10-24
+
+### Changed
+
+- **Requires `phoenix_kit >= 2.38.0 and < 3.0.0`** (was `~> 2.15`). The
+  acting user and the activity log now come from core's
+  `PhoenixKitWeb.Actor` and `PhoenixKit.Activity.log/3` (#12). They are no
+  longer feature-detected, so the package does not compile against an older
+  core. `Web.Helpers.actor_uuid/1`, `scope_actor_uuid/1` and `actor_opts/1`
+  keep their signatures and delegate to `PhoenixKitWeb.Actor`. One behaviour
+  change: the current scope's user now wins over the
+  `:phoenix_kit_current_user` assign, which is core's canonical order.
+- **Every dashboards page sets the admin header trail** (#12):
+  `Dashboards / <dashboard>` on the builder, `Dashboards / New dashboard`,
+  `Dashboards / <dashboard> / Edit` on the settings form (previously titled
+  "Dashboard settings"), `Dashboards / Places` and
+  `Dashboards / Places / <slot>`.
+- Widget contract docs (`PhoenixKitDashboards.Widget`, `NoteWidget`) brought
+  up to date (#13): `default_size`/`min_size` are in lattice cells (25px
+  nominal, a default layout is 64×36), the `context` assign a widget receives
+  (`%{kind => id}`, `%{}` on a context-free dashboard) is documented, and the
+  settings-field type now admits the optional `context: "<kind>"` key.
+- Dependency refresh: `phoenix_kit` 2.64.1 and its transitive set.
+
 ## 0.6.0 - 2026-09-15
 
 ### Changed
