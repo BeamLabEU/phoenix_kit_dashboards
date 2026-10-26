@@ -399,7 +399,9 @@ the host's PubSub; broadcast failures never crash a mutation.
   every write event again; the builder shows a non-holder a shared
   dashboard without edit chrome. `migrate_legacy/0` grants the key once to
   every role that held `dashboards` (flag `dashboards_manage_backfilled`, set
-  only after every grant succeeded).
+  only after every grant succeeded; the roles' keys are read with the
+  module's own query, which raises, because core's
+  `get_permissions_for_role/1` reads a failed lookup as "no keys").
 - Host config `:phoenix_kit_dashboards, :widget_providers` — extra provider
   modules (see the contract table above).
 

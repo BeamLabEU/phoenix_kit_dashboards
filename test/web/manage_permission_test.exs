@@ -245,6 +245,21 @@ defmodule PhoenixKitDashboards.Web.ManagePermissionTest do
       refute "dashboards.manage" in Permissions.get_permissions_for_role(holder.uuid)
     end
 
+    test "a failed permission lookup leaves the flag unset and grants nothing" do
+      Settings.delete_setting(@flag)
+      holder = role!("Editors")
+      {:ok, _} = Permissions.grant_permission(holder.uuid, "dashboards", nil)
+
+      broken_lookup = fn -> raise DBConnection.ConnectionError, "lookup failed" end
+
+      assert_raise DBConnection.ConnectionError, fn ->
+        PhoenixKitDashboards.backfill_manage_permission(role_grants: broken_lookup)
+      end
+
+      assert Settings.get_setting(@flag) != "true"
+      refute "dashboards.manage" in Permissions.get_permissions_for_role(holder.uuid)
+    end
+
     test "a failed grant leaves the flag unset, so the next boot retries" do
       Settings.delete_setting(@flag)
       holder = role!("Editors")
@@ -253,7 +268,7 @@ defmodule PhoenixKitDashboards.Web.ManagePermissionTest do
       failing = fn _role, _key, _by -> {:error, :boom} end
 
       assert {:error, {:manage_backfill_incomplete, failures}} =
-               PhoenixKitDashboards.backfill_manage_permission(failing)
+               PhoenixKitDashboards.backfill_manage_permission(grant: failing)
 
       assert {holder.uuid, {:error, :boom}} in failures
       assert Settings.get_setting(@flag) != "true"

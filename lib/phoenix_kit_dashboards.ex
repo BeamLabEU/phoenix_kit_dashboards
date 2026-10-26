@@ -46,7 +46,7 @@ defmodule PhoenixKitDashboards do
 
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Settings
-  alias PhoenixKit.Users.{Permissions, Roles}
+  alias PhoenixKit.Users.Permissions
 
   @module_key "dashboards"
 
@@ -153,32 +153,49 @@ defmodule PhoenixKitDashboards do
   end
 
   @doc false
-  # The grant function is a parameter only so a test can make a grant fail
-  # and prove the flag then stays unset; production always passes core's.
-  def backfill_manage_permission(grant \\ &Permissions.grant_permission/3) do
+  # `:grant` and `:role_grants` are options only so a test can make a grant
+  # or the lookup fail and prove the flag then stays unset; production always
+  # uses core's grant and `role_grants/0`.
+  def backfill_manage_permission(opts \\ []) do
+    grant = Keyword.get(opts, :grant, &Permissions.grant_permission/3)
+    role_grants = Keyword.get(opts, :role_grants, &role_grants/0)
     key = "#{@module_key}.manage"
 
     failures =
-      for role <- Roles.list_roles(),
-          granted = Permissions.get_permissions_for_role(role.uuid),
+      for {role_uuid, granted} <- role_grants.(),
           @module_key in granted,
           key not in granted,
-          result = grant.(role.uuid, key, nil),
+          result = grant.(role_uuid, key, nil),
           not match?({:ok, _}, result) do
-        {role.uuid, result}
+        {role_uuid, result}
       end
 
-    if failures == [] do
-      Settings.update_setting_with_module(@manage_backfill_key, "true", @module_key)
+    with [] <- failures,
+         {:ok, _} <-
+           Settings.update_setting_with_module(@manage_backfill_key, "true", @module_key) do
       :ok
     else
-      Logger.warning(
-        "[PhoenixKitDashboards] #{key} backfill incomplete, will retry next boot: " <>
-          inspect(failures)
-      )
+      failed ->
+        Logger.warning(
+          "[PhoenixKitDashboards] #{key} backfill incomplete, will retry next boot: " <>
+            inspect(failed)
+        )
 
-      {:error, {:manage_backfill_incomplete, failures}}
+        {:error, {:manage_backfill_incomplete, failed}}
     end
+  end
+
+  # Every role's granted keys, read with a query that RAISES on failure (and
+  # `migrate_legacy/0` rescues it, leaving the flag unset). Core's
+  # `Permissions.get_permissions_for_role/1` rescues a query error to `[]`,
+  # which would read as "this role has no `dashboards`" and set the flag for
+  # good with the role never granted the sub-key.
+  defp role_grants do
+    import Ecto.Query, only: [from: 2]
+
+    from(rp in PhoenixKit.Users.RolePermission, select: {rp.role_uuid, rp.module_key})
+    |> PhoenixKit.RepoHelper.repo().all()
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
   end
 
   @impl PhoenixKit.Module
