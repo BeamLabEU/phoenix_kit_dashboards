@@ -41,6 +41,9 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:renaming_layout, :string, default: nil)
   attr(:show_grid_lines, :boolean, required: true)
   attr(:context, :map, default: %{})
+  # A viewer who may not change the dashboard (`Helpers.manageable_by?/2`)
+  # gets no edit chrome; the events refuse them regardless.
+  attr(:readonly, :boolean, default: false)
 
   def grid(assigns) do
     assigns = assign(assigns, :mode, Dashboard.layout_mode(assigns.dashboard))
@@ -56,6 +59,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
           renaming_layout={@renaming_layout}
           dashboard={@dashboard}
           show_grid_lines={@show_grid_lines}
+          readonly={@readonly}
         />
 
         <%!-- The empty hint only replaces the PIXEL canvas; a grid dashboard
@@ -78,12 +82,14 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
           show_grid_lines={@show_grid_lines}
           empty={@dashboard.layout == []}
           context={@context}
+          readonly={@readonly}
         />
         <.free_mode
           :if={@dashboard.layout != [] and @mode == "free"}
           dashboard={@dashboard}
           scope={@scope}
           context={@context}
+          readonly={@readonly}
         />
       </div>
     </div>
@@ -94,6 +100,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   attr(:renaming_layout, :string, default: nil)
   attr(:dashboard, :map, required: true)
   attr(:show_grid_lines, :boolean, required: true)
+  attr(:readonly, :boolean, default: false)
 
   # The layout tab strip: [Layout 1] [Layout 2] [+], an actions dropdown on the
   # ACTIVE tab (rename / delete — no nested buttons inside tabs, per a11y), and
@@ -149,6 +156,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         <% end %>
 
         <button
+          :if={not @readonly}
           type="button"
           phx-click="add_layout"
           class="btn btn-ghost btn-xs btn-square shrink-0"
@@ -165,7 +173,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       <%!-- START-aligned, not end: this gear sits at the LEFT of the bar, just
       after the layout tabs, so an end-aligned panel extends its full width
       leftward — off the pane and under the admin sidebar. --%>
-      <div class="dropdown shrink-0">
+      <div :if={not @readonly} class="dropdown shrink-0">
         <button
           type="button"
           tabindex="0"

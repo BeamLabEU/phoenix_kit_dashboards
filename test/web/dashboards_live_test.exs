@@ -273,10 +273,10 @@ defmodule PhoenixKitDashboards.Web.DashboardsLiveTest do
     end
 
     # The mirror of the delete test above, on the page that had no such gate.
-    # `manageable_by?/2` only restricts PERSONAL dashboards — it answers true
-    # for every role-scoped one — so the settings page let a holder of the
-    # dashboards permission open a role board they are not a member of and
-    # save it as personal, which makes the editor its owner: the board leaves
+    # `manageable_by?/2` answers for a role-scoped board by the
+    # dashboards.manage key alone, members or not — so without the view check
+    # the settings page would let a manager open a role board they are not a
+    # member of and save it as personal, which makes the editor its owner: the board leaves
     # the role and the role's members lose it.
     test "cannot open, or re-own, a role dashboard the actor can't see", %{conn: conn} do
       {conn, user} = sign_in(conn)

@@ -16,7 +16,14 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   require Logger
 
   import PhoenixKitDashboards.Web.Helpers,
-    only: [actor_uuid: 1, actor_opts: 1, list_roles: 0, manageable_by?: 2, viewable_by?: 2]
+    only: [
+      actor_uuid: 1,
+      actor_opts: 1,
+      can_manage_shared?: 1,
+      list_roles: 0,
+      manageable_by?: 2,
+      viewable_by?: 2
+    ]
 
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Paths
@@ -31,6 +38,9 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
     {:ok,
      socket
      |> assign(:roles, list_roles())
+     # Sharing a dashboard (or keeping one shared) needs dashboards.manage;
+     # without it the form offers Personal only, and save checks again.
+     |> assign(:can_share, can_manage_shared?(socket.assigns[:phoenix_kit_current_scope]))
      |> assign(:page_section, gettext("Dashboards"))
      |> assign(:page_section_path, Paths.index())
      |> assign(:page_crumbs, [])}
@@ -72,9 +82,20 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
 
   @impl true
   def handle_event("save", %{"title" => title} = params, socket) do
-    case socket.assigns.dashboard do
-      nil -> create(socket, title, params)
-      dashboard -> update(socket, dashboard, title, params)
+    cond do
+      shares?(params) and not can_manage_shared?(socket.assigns[:phoenix_kit_current_scope]) ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("You don't have permission to share dashboards.")
+         )}
+
+      is_nil(socket.assigns.dashboard) ->
+        create(socket, title, params)
+
+      true ->
+        update(socket, socket.assigns.dashboard, title, params)
     end
   end
 
@@ -84,6 +105,11 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
     Logger.debug("[Dashboards] Unhandled event: #{inspect(event)}")
     {:noreply, socket}
   end
+
+  # Whether the submitted visibility is anything but personal (what
+  # `scope_attrs/2` would turn into a shared or role dashboard).
+  defp shares?(%{"scope" => scope}), do: scope in ["system", "role"]
+  defp shares?(_params), do: false
 
   defp create(socket, title, params) do
     # Type is fixed at creation ("grid" | "pixel"); it cannot be changed later.
@@ -160,14 +186,15 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
   end
 
   # BOTH gates, the way the manage page and the builder pair them.
-  # `manageable_by?/2` only restricts PERSONAL dashboards — it answers true for
-  # every role-scoped one, for any actor. On its own it let a holder of the
-  # dashboards permission open a role dashboard they are not a member of and
-  # save it as `scope: "personal"`, which makes the editor its owner: the board
-  # leaves the role and the role's members lose it. Seeing it is the missing
-  # half, exactly as the delete path already spells out.
+  # `manageable_by?/2` answers for every role-scoped dashboard by the
+  # dashboards.manage key alone, members or not. On its own it would let a
+  # holder open a role dashboard they are not a member of and save it as
+  # `scope: "personal"`, which makes the editor its owner: the board leaves the
+  # role and the role's members lose it. Seeing it is the missing half,
+  # exactly as the delete path already spells out.
   defp editable_by?(dashboard, socket) do
-    viewable_by?(dashboard, socket) and manageable_by?(dashboard, actor_uuid(socket))
+    viewable_by?(dashboard, socket) and
+      manageable_by?(dashboard, socket.assigns[:phoenix_kit_current_scope])
   end
 
   # The scope + scope-specific attrs from the form params. Switching an
@@ -284,10 +311,8 @@ defmodule PhoenixKitDashboards.Web.DashboardFormLive do
               label={gettext("Visibility")}
               value={(@dashboard && @dashboard.scope) || "personal"}
               options={
-                [
-                  {gettext("Personal"), "personal"},
-                  {gettext("Shared"), "system"}
-                ] ++
+                [{gettext("Personal"), "personal"}] ++
+                  if(@can_share, do: [{gettext("Shared"), "system"}], else: []) ++
                   if(role_scope_visible?(@dashboard),
                     do: [{gettext("By role"), "role"}],
                     else: []

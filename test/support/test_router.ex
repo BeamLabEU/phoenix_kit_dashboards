@@ -31,6 +31,7 @@ defmodule PhoenixKitDashboards.Test.Router do
       # order of the module's admin tabs.
       live("/new", DashboardFormLive, :new)
       live("/:uuid/edit", DashboardFormLive, :edit)
+      live("/places", PlacesLive, :index)
       # BuilderLive keys on handle_params(%{"uuid" => uuid}, ...).
       live("/:uuid", BuilderLive, :edit)
     end

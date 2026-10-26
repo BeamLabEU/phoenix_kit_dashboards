@@ -32,7 +32,10 @@ defmodule PhoenixKitDashboardsTest do
     test "admin tabs are well-formed" do
       tabs = PhoenixKitDashboards.admin_tabs()
       assert Enum.any?(tabs, &(&1.id == :admin_dashboards))
-      assert Enum.all?(tabs, &(&1.permission == "dashboards"))
+      # Places changes what everyone sees, so it needs the sub-key.
+      {[places], rest} = Enum.split_with(tabs, &(&1.id == :admin_dashboards_places))
+      assert places.permission == "dashboards.manage"
+      assert Enum.all?(rest, &(&1.permission == "dashboards"))
     end
 
     test "css sources" do
