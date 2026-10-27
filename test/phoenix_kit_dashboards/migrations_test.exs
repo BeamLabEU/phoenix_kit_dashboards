@@ -208,8 +208,6 @@ defmodule PhoenixKitDashboards.MigrationsTest do
   end
 
   describe "the chain can never destroy the table" do
-    alias PhoenixKit.Migrations.ExpectedSchema
-
     # Compared against the WHOLE expected content, not scanned for a
     # forbidden substring — a substring check only sees statements the
     # builder produced, so anything appended past it (a literal
@@ -263,63 +261,6 @@ defmodule PhoenixKitDashboards.MigrationsTest do
                slip past this list.
                """
       end
-    end
-
-    # Core's manifest for `phoenix_kit_dashboards`' index/constraint objects,
-    # not a hand-typed list — a hand-typed list is maintained by the same hand
-    # that adds a statement, so it catches a slip but never a deliberate one;
-    # the manifest is written on core's side, so this fails both when the
-    # chain emits an object core does not declare AND when core declares an
-    # object the chain stopped adopting.
-    test "up_statements/2 emits exactly the index/constraint operations core's manifest declares for phoenix_kit_dashboards" do
-      for prefix <- ["public", "dashboards_alt"] do
-        actual =
-          Migrations.up_statements(prefix, 1)
-          |> Enum.reject(
-            &(String.starts_with?(&1, "CREATE TABLE") or String.starts_with?(&1, "ALTER TABLE") or
-                String.starts_with?(&1, "COMMENT ON TABLE"))
-          )
-          |> Enum.map(&operation/1)
-
-        expected = expected_index_constraint_operations()
-
-        assert Enum.sort(actual) == Enum.sort(expected),
-               """
-               up_statements(#{inspect(prefix)}, 1) does not emit the operation set
-               core's ExpectedSchema declares for phoenix_kit_dashboards' indexes and
-               constraints.
-
-               unexpected: #{inspect(Enum.sort(actual) -- Enum.sort(expected))}
-               missing:    #{inspect(Enum.sort(expected) -- Enum.sort(actual))}
-               """
-      end
-    end
-
-    defp expected_index_constraint_operations do
-      ExpectedSchema.objects("public")
-      |> Enum.filter(fn object ->
-        case object.check do
-          {_kind, %{table: "phoenix_kit_dashboards"}} ->
-            object.class in [:index, :constraint] and Map.get(object, :presence) == :required
-
-          _ ->
-            false
-        end
-      end)
-      |> Enum.map(fn object ->
-        name = object.check |> elem(1) |> Map.fetch!(:name)
-
-        case object.class do
-          :constraint -> {"DO", name}
-          :index -> {index_verb(object.create), name}
-        end
-      end)
-    end
-
-    defp index_verb(create) do
-      if String.starts_with?(create, "CREATE UNIQUE INDEX"),
-        do: "CREATE UNIQUE INDEX",
-        else: "CREATE INDEX"
     end
 
     # `ON DELETE CASCADE` is part of the foreign key's DEFINITION — the word
@@ -445,7 +386,6 @@ defmodule PhoenixKitDashboards.MigrationsTest do
   end
 
   describe "V1 stays aligned with core's manifest (while core audits the table)" do
-    alias PhoenixKit.Migrations.ExpectedSchema
     alias PhoenixKitDashboards.Schemas.Dashboard
 
     # The lesson phoenix_kit_legal paid for once (three disagreeing DDLs of
@@ -472,79 +412,6 @@ defmodule PhoenixKitDashboards.MigrationsTest do
 
              up_statements/2 must interpolate column_widths/0 — never restate a number.
              """
-    end
-
-    # Core's V133/V139 baseline still creates this table and core's
-    # ExpectedSchema audits that shape, so until the first shape-changing
-    # chain version the two DDLs must agree. This test is optional
-    # documentation more than a guard against drift this package could
-    # introduce (V1 has no second copy of the shape to drift from), but it
-    # doubles as proof that V1 changes nothing.
-    #
-    # The comparison is PER FIELD and asserts both key sets match in full
-    # (not just present keys) — a parse that silently dropped some of core's
-    # columns, or a V1 column core does not declare, must fail here rather
-    # than be skipped.
-    test "every column core declares matches V1's, in full" do
-      core = core_columns()
-      ours = v1_columns()
-
-      assert Map.keys(ours) -- Map.keys(core) == [],
-             "V1 creates columns core's manifest does not declare: " <>
-               inspect(Map.keys(ours) -- Map.keys(core))
-
-      assert Map.keys(core) -- Map.keys(ours) == [],
-             "V1 does not create columns core's manifest declares: " <>
-               inspect(Map.keys(core) -- Map.keys(ours))
-
-      for {column, expected} <- core do
-        assert Map.fetch!(ours, column) == expected,
-               """
-               #{column}: V1 and core's manifest disagree on the column's shape.
-
-               V1:              #{inspect(Map.fetch!(ours, column))}
-               core's manifest: #{inspect(expected)}
-
-               V1 is an adoption and must be shape-identical to core's
-               baseline. A deliberate change is a chain version (V2+).
-               """
-      end
-    end
-
-    # `%{type, default, not_null}` per column, from the newest revision.
-    defp core_columns do
-      prefix = "column:phoenix_kit_dashboards."
-
-      ExpectedSchema.objects("public")
-      |> Enum.filter(&(&1.class == :column and String.starts_with?(&1.id, prefix)))
-      |> Map.new(fn object ->
-        {_version, shape} = List.last(object.revisions)
-
-        {String.replace_prefix(object.id, prefix, ""),
-         %{type: shape.type, default: shape.default, not_null: shape.not_null}}
-      end)
-    end
-
-    # The same shape, parsed back out of the CREATE TABLE V1 emits.
-    defp v1_columns do
-      [create | _] = Migrations.up_statements("public", 1)
-
-      ~r/^\s*"(\w+)"\s+(.+?),?$/m
-      |> Regex.scan(create)
-      |> Map.new(fn [_line, name, definition] -> {name, parse_column(definition)} end)
-    end
-
-    defp parse_column(definition) do
-      {definition, not_null} =
-        case String.replace_suffix(definition, " NOT NULL", "") do
-          ^definition -> {definition, false}
-          trimmed -> {trimmed, true}
-        end
-
-      case String.split(definition, " DEFAULT ", parts: 2) do
-        [type] -> %{type: type, default: nil, not_null: not_null}
-        [type, default] -> %{type: type, default: default, not_null: not_null}
-      end
     end
   end
 end

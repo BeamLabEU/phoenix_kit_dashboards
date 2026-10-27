@@ -40,11 +40,21 @@ defmodule PhoenixKitDashboards.CorePinConformanceTest do
   minor at the top.
   """
 
-  @floor "2.38.0"
-  @must_admit ["2.38.0", "2.38.1", "2.39.0", "2.99.4"]
-  @must_reject ["1.7.236", "2.0.0", "2.15.0", "2.15.4", "2.16.0", "2.22.16", "2.37.5", "3.0.0"]
+  @floor "2.65.0"
+  @must_admit ["2.65.0", "2.65.1", "2.99.4", "3.0.0", "3.9.9"]
+  @must_reject [
+    "1.7.236",
+    "2.0.0",
+    "2.15.0",
+    "2.15.4",
+    "2.16.0",
+    "2.22.16",
+    "2.37.5",
+    "2.64.9",
+    "4.0.0"
+  ]
 
-  test "the :phoenix_kit requirement admits every core >= 2.38.0 minor and nothing else" do
+  test "the :phoenix_kit requirement admits every core >= 2.65.0 minor and nothing else" do
     requirement = core_requirement()
 
     assert match?({:ok, _parsed}, Version.parse_requirement(requirement)),

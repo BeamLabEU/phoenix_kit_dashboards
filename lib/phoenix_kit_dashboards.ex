@@ -105,7 +105,7 @@ defmodule PhoenixKitDashboards do
   The manifest of this module's tables, for `mix phoenix_kit.repair` and
   `mix phoenix_kit.doctor`; see `PhoenixKitDashboards.ExpectedSchema`.
   """
-  # No `@impl`, so this compiles against a core that lacks the callback.
+  @impl PhoenixKit.Module
   def expected_schema, do: PhoenixKitDashboards.ExpectedSchema
 
   @impl PhoenixKit.Module
