@@ -158,7 +158,7 @@ defmodule PhoenixKitDashboards.Web.SlotComponents do
         {gettext("Change")}
       </.button>
       <.button
-        :if={Helpers.manageable_by?(@active, Helpers.scope_actor_uuid(@scope))}
+        :if={Helpers.manageable_by?(@active, @scope)}
         variant="outline"
         size="sm"
         navigate={Paths.builder(@active.uuid)}

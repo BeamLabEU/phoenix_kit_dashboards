@@ -50,6 +50,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   import PhoenixKitDashboards.Web.Helpers,
     only: [
       viewable_by?: 2,
+      manageable_by?: 2,
       actor_opts: 1,
       actor_uuid: 1,
       scope_label: 1
@@ -68,6 +69,14 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
   alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Slot
   alias PhoenixKitDashboards.Widget
+
+  # Events that change the dashboard: refused without `manageable_by?/2`
+  # (its owner for a personal one, dashboards.manage for a shared or role
+  # one). The rest only change what this session is looking at.
+  @write_events ~w(add_widget add_widget_at add_widget_px remove_widget move_widget_grid
+                   reorder_widgets add_layout rename_layout delete_layout set_dims fit_screen
+                   cycle_view resize_widget_to move_widget_to restack_widget save_settings
+                   open_settings settings_changed start_rename_layout)
 
   # How often the host checks whether any live widget is due for a refresh.
   @refresh_tick_ms 1000
@@ -106,7 +115,8 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
      # the modal, because they describe an unsaved form, not the dashboard.
      |> assign(:bind_sources, %{})
      |> assign(:leaf_values, %{})
-     |> assign(:places, [])}
+     |> assign(:places, [])
+     |> assign(:can_manage, false)}
   end
 
   @impl true
@@ -123,6 +133,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           {:noreply,
            socket
            |> assign(:dashboard, dashboard)
+           |> assign(:can_manage, can_manage?(dashboard, socket))
            # Trail: Admin Panel / Dashboards / <dashboard>.
            |> assign(:page_title, dashboard.title)
            |> assign(:page_section, gettext("Dashboards"))
@@ -187,25 +198,39 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
          |> push_navigate(to: Paths.index())}
 
       dashboard ->
-        if viewable_by?(dashboard, socket) do
-          socket = assign(socket, :dashboard, dashboard)
-          do_handle_event(event, params, ensure_active_layout(socket))
-        else
-          # Access is re-checked against the FRESH dashboard row, so a scope
-          # flip (e.g. re-scoped to someone else's personal) fails closed here.
-          # NOTE: the actor's roles/permissions come from the mount-time scope
-          # (core's on_mount doesn't re-run per event), so a role/permission
-          # REVOCATION only takes effect on the next remount — not mid-session.
-          {:noreply,
-           socket
-           |> put_flash(
-             :error,
-             gettext("You do not have access to this dashboard.")
-           )
-           |> push_navigate(to: Paths.index())}
+        cond do
+          not viewable_by?(dashboard, socket) ->
+            no_access(socket)
+
+          event in @write_events and not can_manage?(dashboard, socket) ->
+            # A viewer of a shared dashboard without dashboards.manage (or of
+            # someone else's role board) sees it but cannot change it.
+            {:noreply,
+             socket
+             |> assign(:dashboard, dashboard)
+             |> assign(:can_manage, false)
+             |> put_flash(:error, gettext("You don't have permission to change this dashboard."))}
+
+          true ->
+            socket =
+              assign(socket, dashboard: dashboard, can_manage: can_manage?(dashboard, socket))
+
+            do_handle_event(event, params, ensure_active_layout(socket))
         end
     end
   end
+
+  # Access is re-checked against the FRESH dashboard row, so a scope flip
+  # (e.g. re-scoped to someone else's personal) fails closed here.
+  defp no_access(socket) do
+    {:noreply,
+     socket
+     |> put_flash(:error, gettext("You do not have access to this dashboard."))
+     |> push_navigate(to: Paths.index())}
+  end
+
+  defp can_manage?(dashboard, socket),
+    do: manageable_by?(dashboard, socket.assigns[:phoenix_kit_current_scope])
 
   # The active layout may have been deleted by another session — fall back to
   # the first one rather than editing a ghost id.
@@ -749,6 +774,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
         {:noreply,
          socket
          |> assign(:dashboard, dashboard)
+         |> assign(:can_manage, can_manage?(dashboard, socket))
          |> ensure_active_layout()
          |> maybe_schedule_refresh()}
       else
@@ -1022,6 +1048,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           <h1 class="text-lg font-semibold">{@dashboard.title}</h1>
           <span class="badge badge-ghost badge-sm">{scope_label(@dashboard.scope)}</span>
           <.link
+            :if={@can_manage}
             navigate={Paths.edit(@dashboard.uuid)}
             class="btn btn-ghost btn-xs btn-square"
             title={gettext("Dashboard settings")}
@@ -1061,6 +1088,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           <%!-- Client-side toggle (JS.toggle, no server round-trip) — the panel is
           always rendered, hidden by default, so opening it is instant. --%>
           <button
+            :if={@can_manage}
             id="dashboard-catalog-toggle"
             type="button"
             phx-click={JS.toggle(to: "#dashboard-catalog")}
@@ -1086,8 +1114,9 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
           renaming_layout={@renaming_layout}
           show_grid_lines={@show_grid_lines}
           context={@preview_context}
+          readonly={not @can_manage}
         />
-        <.catalog_drawer catalog={@catalog} />
+        <.catalog_drawer :if={@can_manage} catalog={@catalog} />
       </div>
 
       <.settings_modal

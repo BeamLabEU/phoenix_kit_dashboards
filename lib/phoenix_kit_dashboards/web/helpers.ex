@@ -99,18 +99,38 @@ defmodule PhoenixKitDashboards.Web.Helpers do
     Dashboards.visible_to?(dashboard, actor_uuid(socket), user_role_uuids(socket))
   end
 
-  @doc """
-  Whether `actor_uuid` may manage (edit/delete) `dashboard`: own personal ones,
-  or any shared/role one (the admin section is already owner/admin-gated). Takes
-  the actor uuid so socket callers (`actor_uuid(socket)`) and render-side
-  callers (the current-user uuid) share one rule — replacing the former
-  `can_delete?` / `deletable?` / `can_manage?` triplet.
-  """
-  @spec manageable_by?(map(), String.t() | nil) :: boolean()
-  def manageable_by?(%{scope: "personal"} = dashboard, actor_uuid),
-    do: dashboard.owner_user_uuid == actor_uuid
+  @manage_permission "dashboards.manage"
 
-  def manageable_by?(_dashboard, _actor_uuid), do: true
+  @doc "The sub-permission that manages shared dashboards and places."
+  @spec manage_permission() :: String.t()
+  def manage_permission, do: @manage_permission
+
+  @doc """
+  Whether `scope` may manage (edit, re-scope, delete) `dashboard`: a personal
+  dashboard only by its owner, a shared (`system`) or `role` one only by a
+  holder of `dashboards.manage` (an Owner always). The base `dashboards` key
+  reaches the section and shows a viewer the shared dashboards, but does not
+  let them change what everyone else sees. Takes the scope so socket callers
+  and render-side callers (the slot chrome) share one rule.
+  """
+  @spec manageable_by?(map(), map() | nil) :: boolean()
+  def manageable_by?(%{scope: "personal"} = dashboard, scope) do
+    owner = dashboard.owner_user_uuid
+    not is_nil(owner) and owner == scope_actor_uuid(scope)
+  end
+
+  def manageable_by?(_dashboard, scope), do: can_manage_shared?(scope)
+
+  @doc """
+  Whether `scope` holds `dashboards.manage` (an Owner always): creating,
+  editing and deleting shared and role dashboards, and choosing what a place
+  shows. Fails closed on an absent scope.
+  """
+  @spec can_manage_shared?(map() | nil) :: boolean()
+  def can_manage_shared?(%Scope{} = scope),
+    do: Scope.owner?(scope) or Scope.can?(scope, @manage_permission)
+
+  def can_manage_shared?(_scope), do: false
 
   @doc """
   Apply the locale the host put in an EMBED session.
@@ -192,16 +212,10 @@ defmodule PhoenixKitDashboards.Web.Helpers do
 
   Placing a dashboard is an administrative act separate from editing one: a
   person may own a dashboard they are not allowed to publish onto the admin
-  home.
+  home. It needs `dashboards.manage`, like changing a shared dashboard.
   """
   @spec can_manage_places?(map() | nil) :: boolean()
-  def can_manage_places?(nil), do: false
-
-  def can_manage_places?(scope) do
-    Code.ensure_loaded?(Scope) and Scope.has_module_access?(scope, "dashboards")
-  rescue
-    _ -> false
-  end
+  def can_manage_places?(scope), do: can_manage_shared?(scope)
 
   @doc "All roles (for pickers); `[]` when the roles API is unavailable."
   @spec list_roles() :: [struct()]

@@ -42,8 +42,11 @@ defmodule PhoenixKitDashboards do
   use PhoenixKit.Module
   use Gettext, backend: PhoenixKitDashboards.Gettext
 
+  require Logger
+
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKit.Settings
+  alias PhoenixKit.Users.Permissions
 
   @module_key "dashboards"
 
@@ -112,11 +115,94 @@ defmodule PhoenixKitDashboards do
       label: "Dashboards",
       icon: "hero-squares-2x2",
       description: "Build custom dashboard pages from widgets exposed by any module",
+      # The base key builds and keeps one's own private dashboards and opens
+      # the shared ones. `dashboards.manage` changes what everyone sees:
+      # creating, editing and deleting shared (and role) dashboards, and
+      # choosing what each place shows. `migrate_legacy/0` grants it once to
+      # every role that held `dashboards` before the split.
+      sub_permissions: [
+        %{
+          key: "manage",
+          label: "Manage shared dashboards and places",
+          description:
+            "Create, edit and delete dashboards everyone sees, and choose which dashboard each place shows"
+        }
+      ],
       # Renders the label translated in the admin permissions matrix, the same
       # way the sidebar tabs below translate theirs.
       gettext_backend: PhoenixKitDashboards.Gettext,
       gettext_domain: "default"
     }
+  end
+
+  @manage_backfill_key "dashboards_manage_backfilled"
+
+  @doc """
+  One-time data repairs core calls on every boot; each carries its own
+  "already done" flag and runs once.
+
+    * `dashboards.manage` is granted to every role that already holds the
+      base `dashboards` key, so nobody loses the right to change shared
+      dashboards and places when it moves behind the sub-key. A role granted
+      `dashboards` afterwards gets the narrow meaning, and a later revoke
+      sticks. The flag is set only once every grant succeeded, so a failed
+      pass retries on the next boot.
+  """
+  @impl PhoenixKit.Module
+  def migrate_legacy do
+    if Settings.get_setting(@manage_backfill_key) == "true",
+      do: :ok,
+      else: backfill_manage_permission()
+  rescue
+    error ->
+      Logger.warning("[PhoenixKitDashboards] migrate_legacy failed: #{Exception.message(error)}")
+      {:error, Exception.message(error)}
+  end
+
+  @doc false
+  # `:grant` and `:role_grants` are options only so a test can make a grant
+  # or the lookup fail and prove the flag then stays unset; production always
+  # uses core's grant and `role_grants/0`.
+  def backfill_manage_permission(opts \\ []) do
+    grant = Keyword.get(opts, :grant, &Permissions.grant_permission/3)
+    role_grants = Keyword.get(opts, :role_grants, &role_grants/0)
+    key = "#{@module_key}.manage"
+
+    failures =
+      for {role_uuid, granted} <- role_grants.(),
+          @module_key in granted,
+          key not in granted,
+          result = grant.(role_uuid, key, nil),
+          not match?({:ok, _}, result) do
+        {role_uuid, result}
+      end
+
+    with [] <- failures,
+         {:ok, _} <-
+           Settings.update_setting_with_module(@manage_backfill_key, "true", @module_key) do
+      :ok
+    else
+      failed ->
+        Logger.warning(
+          "[PhoenixKitDashboards] #{key} backfill incomplete, will retry next boot: " <>
+            inspect(failed)
+        )
+
+        {:error, {:manage_backfill_incomplete, failed}}
+    end
+  end
+
+  # Every role's granted keys, read with a query that RAISES on failure (and
+  # `migrate_legacy/0` rescues it, leaving the flag unset). Core's
+  # `Permissions.get_permissions_for_role/1` rescues a query error to `[]`,
+  # which would read as "this role has no `dashboards`" and set the flag for
+  # good with the role never granted the sub-key.
+  defp role_grants do
+    import Ecto.Query, only: [from: 2]
+
+    from(rp in PhoenixKit.Users.RolePermission, select: {rp.role_uuid, rp.module_key})
+    |> PhoenixKit.RepoHelper.repo().all()
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
   end
 
   @impl PhoenixKit.Module
@@ -188,7 +274,8 @@ defmodule PhoenixKitDashboards do
         path: "dashboards/places",
         priority: 652,
         level: :admin,
-        permission: @module_key,
+        # What a place shows is site-wide (the admin home for everyone).
+        permission: "dashboards.manage",
         parent: :admin_dashboards,
         match: :exact,
         # VISIBLE, unlike this module's other hidden pages: it is a place an
@@ -250,7 +337,12 @@ defmodule PhoenixKitDashboards do
       dgettext_noop("default", "New Dashboard"),
       dgettext_noop("default", "Dashboard Settings"),
       dgettext_noop("default", "Dashboard Builder"),
-      dgettext_noop("default", "Places")
+      dgettext_noop("default", "Places"),
+      dgettext_noop("default", "Manage shared dashboards and places"),
+      dgettext_noop(
+        "default",
+        "Create, edit and delete dashboards everyone sees, and choose which dashboard each place shows"
+      )
     ]
   end
 

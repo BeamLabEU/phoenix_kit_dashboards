@@ -3,21 +3,40 @@ defmodule PhoenixKitDashboards.Web.HelpersTest do
 
   alias PhoenixKitDashboards.Web.Helpers
 
-  # The consolidated manage rule (review #10) — was three functions under three
-  # names across the LVs; now one, tested directly.
+  defp scope(uuid, roles),
+    do: %PhoenixKit.Users.Auth.Scope{
+      user: %{uuid: uuid},
+      authenticated?: true,
+      cached_roles: roles,
+      cached_permissions: MapSet.new(["dashboards"])
+    }
+
+  # The one manage rule, tested directly (the sub-key's registry-backed path
+  # is covered in ManagePermissionTest).
   describe "manageable_by?/2" do
     test "own personal dashboard is manageable" do
-      assert Helpers.manageable_by?(%{scope: "personal", owner_user_uuid: "u1"}, "u1")
+      assert Helpers.manageable_by?(%{scope: "personal", owner_user_uuid: "u1"}, scope("u1", []))
     end
 
-    test "someone else's personal dashboard is not" do
-      refute Helpers.manageable_by?(%{scope: "personal", owner_user_uuid: "u1"}, "u2")
+    test "someone else's personal dashboard is not, even for an Owner" do
+      refute Helpers.manageable_by?(%{scope: "personal", owner_user_uuid: "u1"}, scope("u2", []))
+
+      refute Helpers.manageable_by?(
+               %{scope: "personal", owner_user_uuid: "u1"},
+               scope("u2", ["Owner"])
+             )
+
       refute Helpers.manageable_by?(%{scope: "personal", owner_user_uuid: "u1"}, nil)
     end
 
-    test "shared/system and role dashboards are manageable by any admin on the page" do
-      assert Helpers.manageable_by?(%{scope: "system", owner_user_uuid: nil}, "anyone")
-      assert Helpers.manageable_by?(%{scope: "role", owner_user_uuid: nil}, nil)
+    test "shared and role dashboards are not manageable on the base key alone" do
+      refute Helpers.manageable_by?(%{scope: "system", owner_user_uuid: nil}, scope("u1", []))
+      refute Helpers.manageable_by?(%{scope: "role", owner_user_uuid: nil}, nil)
+
+      assert Helpers.manageable_by?(
+               %{scope: "system", owner_user_uuid: nil},
+               scope("u1", ["Owner"])
+             )
     end
   end
 

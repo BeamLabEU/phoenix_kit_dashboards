@@ -40,8 +40,22 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   alias PhoenixKitDashboards.Slots
   alias PhoenixKitDashboards.Web.Helpers
 
+  # What a place shows is site-wide — the admin home for everyone — so the
+  # page needs dashboards.manage. Its tab says so too (core refuses the route),
+  # and every write below checks again against the scope as it is now.
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, session, socket) do
+    if Helpers.can_manage_places?(socket.assigns[:phoenix_kit_current_scope]) do
+      do_mount(params, session, socket)
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, gettext("You don't have permission to change places."))
+       |> push_navigate(to: Paths.index())}
+    end
+  end
+
+  defp do_mount(_params, _session, socket) do
     if connected?(socket), do: Placements.subscribe()
 
     {:ok,
@@ -79,18 +93,34 @@ defmodule PhoenixKitDashboards.Web.PlacesLive do
   end
 
   def handle_event("place", %{"slot" => slot_key} = params, socket) do
-    with_slot(socket, slot_key, fn ->
-      Placements.put(slot_key, params, Helpers.actor_opts(socket))
+    authorized(socket, fn ->
+      with_slot(socket, slot_key, fn ->
+        Placements.put(slot_key, params, Helpers.actor_opts(socket))
+      end)
     end)
   end
 
   def handle_event("unplace", %{"slot" => slot_key} = params, socket) do
-    with_slot(socket, slot_key, fn ->
-      Placements.delete(slot_key, params, Helpers.actor_opts(socket))
+    authorized(socket, fn ->
+      with_slot(socket, slot_key, fn ->
+        Placements.delete(slot_key, params, Helpers.actor_opts(socket))
+      end)
     end)
   end
 
   def handle_event("set_priority", %{"slot" => slot_key, "priority" => raw} = params, socket) do
+    authorized(socket, fn -> set_priority(socket, slot_key, raw, params) end)
+  end
+
+  defp authorized(socket, fun) do
+    if Helpers.can_manage_places?(socket.assigns[:phoenix_kit_current_scope]),
+      do: fun.(),
+      else:
+        {:noreply,
+         put_flash(socket, :error, gettext("You don't have permission to change places."))}
+  end
+
+  defp set_priority(socket, slot_key, raw, params) do
     case Integer.parse(to_string(raw)) do
       {priority, _} ->
         with_slot(socket, slot_key, fn ->

@@ -168,7 +168,8 @@ Repo-local aliases:
     gates visibility/delete via `Web.Helpers.viewable_by?/2` and
     `manageable_by?/2` (context-side: `Dashboards.visible_to?/3`).
     `list_for_user/2` takes the user's role uuids so role dashboards surface for
-    their members.
+    their members. The form offers "Shared" only to a holder of
+    `dashboards.manage`, and save refuses a shared or role visibility without it.
   - Only `system` dashboards may back a project-extension tab
     (`project_dashboard_options/0` lists exactly those) — personal and role
     dashboards carry per-user visibility a project-wide tab cannot honour.
@@ -387,8 +388,20 @@ the host's PubSub; broadcast failures never crash a mutation.
 - Setting `dashboards_enabled` (boolean) — the module gate.
 - Permission key `"dashboards"`, declared by `permission_metadata/0` with
   `gettext_backend:`/`gettext_domain:` so the admin matrix renders it
-  translated. All four tabs require it. The project extension declares
-  `permission_actions: [:view]`.
+  translated: building and keeping one's own personal dashboards, and opening
+  the shared ones. The project extension declares `permission_actions: [:view]`.
+- Sub-permission `"dashboards.manage"`: creating, editing (builder and
+  settings page) and deleting shared and role dashboards, and the Places
+  screen (its tab carries the key). `Web.Helpers.manageable_by?/2` takes the
+  scope and is the one rule — a personal dashboard only by its owner, any
+  other only by a holder (an Owner always); `can_manage_places?/1` and
+  `can_manage_shared?/1` read the same key. Every page checks at mount and
+  every write event again; the builder shows a non-holder a shared
+  dashboard without edit chrome. `migrate_legacy/0` grants the key once to
+  every role that held `dashboards` (flag `dashboards_manage_backfilled`, set
+  only after every grant succeeded; the roles' keys are read with the
+  module's own query, which raises, because core's
+  `get_permissions_for_role/1` reads a failed lookup as "no keys").
 - Host config `:phoenix_kit_dashboards, :widget_providers` — extra provider
   modules (see the contract table above).
 

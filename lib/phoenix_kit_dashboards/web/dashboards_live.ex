@@ -61,7 +61,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
          # Must be able to SEE it to delete it (mirrors clone) — so a crafted
          # uuid can't blind-delete a role dashboard the actor isn't a member of.
          true <- viewable_by?(dashboard, socket),
-         true <- manageable_by?(dashboard, actor_uuid(socket)),
+         true <- manageable_by?(dashboard, socket.assigns[:phoenix_kit_current_scope]),
          {:ok, _} <- Dashboards.delete(dashboard, actor_opts(socket)) do
       {:noreply,
        socket
@@ -233,7 +233,7 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
                 label={gettext("Actions")}
               >
                 <.table_row_menu_link
-                  :if={manageable_by?(dashboard, @current_user_uuid)}
+                  :if={manageable_by?(dashboard, @phoenix_kit_current_scope)}
                   navigate={Paths.edit(dashboard.uuid)}
                   icon="hero-pencil"
                   label={gettext("Edit")}
@@ -245,9 +245,9 @@ defmodule PhoenixKitDashboards.Web.DashboardsLive do
                   icon="hero-document-duplicate"
                   label={gettext("Clone")}
                 />
-                <.table_row_menu_divider :if={manageable_by?(dashboard, @current_user_uuid)} />
+                <.table_row_menu_divider :if={manageable_by?(dashboard, @phoenix_kit_current_scope)} />
                 <.table_row_menu_button
-                  :if={manageable_by?(dashboard, @current_user_uuid)}
+                  :if={manageable_by?(dashboard, @phoenix_kit_current_scope)}
                   phx-click="delete"
                   phx-value-uuid={dashboard.uuid}
                   data-confirm={gettext("Delete this dashboard?")}
