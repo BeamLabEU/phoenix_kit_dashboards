@@ -30,12 +30,6 @@ defmodule PhoenixKitDashboards.I18nTest do
 
   use ExUnit.Case, async: true
 
-  # Excluded by `test/test_helper.exs` when running against a `phoenix_kit`
-  # release that pre-dates the `gettext_backend` API (PR BeamLabEU/phoenix_kit#522).
-  # This module's mix.exs floor (~> 2.0) already postdates it, so this only
-  # matters if `phoenix_kit` is ever resolved down to a pre-API release.
-  @moduletag :requires_phoenix_kit_i18n_api
-
   alias PhoenixKit.Dashboard.Tab
   alias PhoenixKitDashboards.Gettext, as: DashboardsGettext
   alias PhoenixKitDashboards.Web.Helpers

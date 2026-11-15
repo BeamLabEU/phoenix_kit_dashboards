@@ -151,14 +151,9 @@ defmodule PhoenixKitDashboards.Registry do
   # Every module that opts into the widget contract. This module is always first
   # in the list (it's guaranteed loaded and provides the built-in widgets the same
   # way any other module does), then core's discovered modules — deduped so it is
-  # queried once. Degrades gracefully if core's ModuleRegistry isn't loaded.
+  # queried once.
   defp provider_modules do
-    discovered =
-      if Code.ensure_loaded?(PhoenixKit.ModuleRegistry) do
-        PhoenixKit.ModuleRegistry.all_modules()
-      else
-        []
-      end
+    discovered = PhoenixKit.ModuleRegistry.all_modules()
 
     ([PhoenixKitDashboards | discovered] ++ config_providers())
     |> Enum.uniq()
@@ -230,13 +225,9 @@ defmodule PhoenixKitDashboards.Registry do
   # ── Visibility ─────────────────────────────────────────────────────
 
   defp module_enabled?(key) do
-    if Code.ensure_loaded?(PhoenixKit.ModuleRegistry) do
-      case PhoenixKit.ModuleRegistry.get_by_key(key) do
-        nil -> true
-        module -> safe_enabled?(module)
-      end
-    else
-      true
+    case PhoenixKit.ModuleRegistry.get_by_key(key) do
+      nil -> true
+      module -> safe_enabled?(module)
     end
   rescue
     _ -> true
@@ -249,13 +240,7 @@ defmodule PhoenixKitDashboards.Registry do
   end
 
   defp has_access?(scope, key) do
-    if Code.ensure_loaded?(Scope) do
-      Scope.has_module_access?(scope, key)
-    else
-      # No Scope module → can't evaluate a permission; allow (the widget's
-      # module_key still gates on enablement).
-      true
-    end
+    Scope.has_module_access?(scope, key)
   rescue
     # An error evaluating access fails CLOSED — don't leak a permissioned widget.
     _ -> false

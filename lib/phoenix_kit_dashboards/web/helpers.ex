@@ -8,10 +8,10 @@ defmodule PhoenixKitDashboards.Web.Helpers do
 
   use Gettext, backend: PhoenixKitDashboards.Gettext
 
-  alias PhoenixKit.Users.Auth
   alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKit.Users.Roles
   alias PhoenixKitDashboards.Dashboards
+  alias PhoenixKitWeb.Users.Auth, as: WebAuth
 
   @doc """
   Dynamic translation for catalog DATA (widget names, descriptions, view names,
@@ -164,48 +164,18 @@ defmodule PhoenixKitDashboards.Web.Helpers do
 
   A dashboard rendered with `live_render/3` inside another page (the projects
   hub tab, core's admin home) mounts off-router, so none of the `on_mount`
-  hooks that normally assign the current user have run. Prefer core's canonical
-  helper when the running core exposes it; fall back to resolving the uuid the
-  host put in the session.
-
-  `Code.ensure_loaded?/1` comes BEFORE `function_exported?/3` deliberately: on a
-  cold VM the module may not be loaded yet and `function_exported?/3` answers
-  false WITHOUT loading it, silently taking the legacy path against a core that
-  does export the helper.
+  hooks that normally assign the current user have run. Core's canonical
+  helper (`PhoenixKitWeb.Users.Auth.assign_embedded_current_user/2`) does it.
   """
   @spec assign_embed_identity(Phoenix.LiveView.Socket.t(), map()) ::
           Phoenix.LiveView.Socket.t()
   def assign_embed_identity(socket, session) do
     if is_nil(socket.assigns[:phoenix_kit_current_scope]) do
-      do_assign_embed_identity(socket, session)
+      WebAuth.assign_embedded_current_user(socket, session)
     else
       socket
     end
   end
-
-  defp do_assign_embed_identity(socket, session) do
-    if Code.ensure_loaded?(PhoenixKitWeb.Users.Auth) and
-         function_exported?(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, 2) do
-      # credo:disable-for-next-line Credo.Check.Refactor.Apply
-      apply(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, [socket, session])
-    else
-      {user, scope} = resolve_embed_identity(session["current_user_uuid"])
-
-      Phoenix.Component.assign(socket,
-        phoenix_kit_current_user: user,
-        phoenix_kit_current_scope: scope
-      )
-    end
-  end
-
-  defp resolve_embed_identity(uuid) when is_binary(uuid) and uuid != "" do
-    user = uuid |> Auth.get_user() |> Auth.ensure_active_user()
-    {user, Scope.for_user(user)}
-  rescue
-    _ -> {nil, Scope.for_user(nil)}
-  end
-
-  defp resolve_embed_identity(_uuid), do: {nil, Scope.for_user(nil)}
 
   @doc """
   Whether this viewer may change what is shown in a place.
@@ -220,7 +190,7 @@ defmodule PhoenixKitDashboards.Web.Helpers do
   @doc "All roles (for pickers); `[]` when the roles API is unavailable."
   @spec list_roles() :: [struct()]
   def list_roles do
-    if Code.ensure_loaded?(Roles), do: Roles.list_roles(), else: []
+    Roles.list_roles()
   rescue
     _ -> []
   end

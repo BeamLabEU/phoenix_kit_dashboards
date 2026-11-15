@@ -58,8 +58,6 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   import PhoenixKitDashboards.Web.BuilderComponents,
     only: [grid_mode: 1, free_mode: 1, pixel_cells: 1]
 
-  alias PhoenixKit.Users.Auth
-  alias PhoenixKit.Users.Auth.Scope
   alias PhoenixKitDashboards.Binds
   alias PhoenixKitDashboards.Dashboards
   alias PhoenixKitDashboards.Layouts
@@ -69,6 +67,7 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   alias PhoenixKitDashboards.Schemas.Dashboard
   alias PhoenixKitDashboards.Web.Helpers
   alias PhoenixKitDashboards.Widget
+  alias PhoenixKitWeb.Users.Auth, as: WebAuth
 
   @refresh_tick_ms 1000
   @id_prefix "pk-projtab-"
@@ -348,36 +347,14 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLive do
   # ── Mount helpers ─────────────────────────────────────────────────
 
   # Reconstruct user + scope from the embed session (the on_mount hook never
-  # runs under live_render). Prefer core's canonical helper when the running
-  # core exposes it; fall back to a local resolve against older cores.
+  # runs under live_render), through core's canonical helper.
   defp assign_embed_identity(socket, session) do
     if is_nil(socket.assigns[:phoenix_kit_current_scope]) do
-      # ensure_loaded? before function_exported?: on a cold VM the module may
-      # not be loaded yet and function_exported?/3 answers false WITHOUT
-      # loading it — silently taking the legacy fallback against a core that
-      # does export the canonical helper. (Same trap as Registry's provider
-      # discovery.)
-      if Code.ensure_loaded?(PhoenixKitWeb.Users.Auth) and
-           function_exported?(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, 2) do
-        # credo:disable-for-next-line Credo.Check.Refactor.Apply
-        apply(PhoenixKitWeb.Users.Auth, :assign_embedded_current_user, [socket, session])
-      else
-        {user, scope} = resolve_embed_identity(session["current_user_uuid"])
-        assign(socket, phoenix_kit_current_user: user, phoenix_kit_current_scope: scope)
-      end
+      WebAuth.assign_embedded_current_user(socket, session)
     else
       socket
     end
   end
-
-  defp resolve_embed_identity(uuid) when is_binary(uuid) and uuid != "" do
-    user = uuid |> Auth.get_user() |> Auth.ensure_active_user()
-    {user, Scope.for_user(user)}
-  rescue
-    _ -> {nil, Scope.for_user(nil)}
-  end
-
-  defp resolve_embed_identity(_), do: {nil, Scope.for_user(nil)}
 
   defp load_dashboard(socket, config) do
     {dashboard, state} =

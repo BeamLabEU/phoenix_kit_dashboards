@@ -1286,14 +1286,9 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
   def settings_leaf_key(_other), do: nil
 
   # Site-wide editor mode. Leaf's mode clauses have no catch-all, so anything
-  # unrecognised must be normalised here rather than blowing up inside Leaf —
-  # and `get_editor_mode/0` only exists on newer core builds.
+  # unrecognised must be normalised here rather than blowing up inside Leaf.
   defp editor_mode do
-    if function_exported?(PhoenixKit.Settings, :get_editor_mode, 0) do
-      normalize_mode(PhoenixKit.Settings.get_editor_mode())
-    else
-      :hybrid
-    end
+    normalize_mode(PhoenixKit.Settings.get_editor_mode())
   rescue
     _ -> :hybrid
   end

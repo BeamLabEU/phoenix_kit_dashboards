@@ -242,10 +242,8 @@ defmodule PhoenixKitDashboards.Binds do
   # A context kind is namespaced by the module key that owns it
   # ("projects.project" -> the module registered under "projects").
   defp owner_module(kind) do
-    with [module_key | _] <- String.split(kind, "."),
-         true <- Code.ensure_loaded?(PhoenixKit.ModuleRegistry) do
-      PhoenixKit.ModuleRegistry.get_by_key(module_key)
-    else
+    case String.split(kind, ".") do
+      [module_key | _] -> PhoenixKit.ModuleRegistry.get_by_key(module_key)
       _ -> nil
     end
   rescue

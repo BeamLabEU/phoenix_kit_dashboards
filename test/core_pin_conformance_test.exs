@@ -6,55 +6,34 @@ defmodule PhoenixKitDashboards.CorePinConformanceTest do
   core MINOR, against a floor that is lower than the API this module calls,
   and against a local path override reaching a commit.
 
-  The trap is the three-segment form: `~> 2.15.x` expands to
-  `>= 2.15.x and < 2.16.0`, so no 2.16 or later core satisfies it. The
+  The trap is the three-segment form: `~> 3.5.x` expands to
+  `>= 3.5.x and < 3.6.0`, so no 3.6 or later core satisfies it. The
   breakage lands on CONSUMERS, never here — a host depending on both this
   module and a newer core minor gets an unsolvable dependency set and
   `mix deps.get` fails outright, with no degraded mode. Nothing else in this
   repo's own test run would notice, which is why the check is a test rather
   than a convention.
 
-  The floor is **2.15.0**, and it is a real floor rather than a rounded guess:
-  `Placements.write/3` calls `Settings.update_setting_with_module/4`, whose
-  arity-4 form first shipped in core 2.15.0. Below it that call raises
-  `UndefinedFunctionError`, which `write/3` rescues into a generic message —
-  so on an older 2.x every place/unplace/reprioritise fails SILENTLY. That is
-  why 2.0.0 is now in `@must_reject`: this list said the module worked there,
-  and it did not.
-
-  Core 1.7 is deliberately excluded: core 2.0.0 squashed the migration chain to
-  a V135 floor and this module is verified only against that baseline.
+  The requirement is `>= 3.5.0 and < 4.0.0`. The floor is the minimum core
+  every PhoenixKit module requires; it carries everything this module builds
+  on: `Settings.update_setting_with_module/4` (which `Placements.write/3`
+  calls), `PhoenixKitWeb.Actor`, `Activity.log/3` and the `file_references/0`
+  and `expected_schema/0` callbacks. The ceiling is open through every core
+  3.x.
 
   ## Raising the floor again
 
-  Whenever this module starts calling a core function newer than 2.38.0, move
+  Whenever this module starts calling a core function newer than 3.5.0, move
   BOTH the `mix.exs` requirement and `@floor` here, and add the version below
   it to `@must_reject`. A floor that lags the API is invisible to every other
-  gate in the repo, because the suite runs against local core.
-
-  The floor is `>= 2.38.0 and < 3.0.0` now: the actor and the activity log
-  come from `PhoenixKitWeb.Actor` and `Activity.log/3`, first shipped in core
-  2.38.0 and no longer feature-detected — an older core does not compile the
-  package. Any earlier floor's reasons above still hold below it. Keep the
-  compound form: patch-precise at the bottom, open through every later 2.x
-  minor at the top.
+  gate in the repo, because the suite runs against the latest core.
   """
 
-  @floor "2.65.0"
-  @must_admit ["2.65.0", "2.65.1", "2.99.4", "3.0.0", "3.9.9"]
-  @must_reject [
-    "1.7.236",
-    "2.0.0",
-    "2.15.0",
-    "2.15.4",
-    "2.16.0",
-    "2.22.16",
-    "2.37.5",
-    "2.64.9",
-    "4.0.0"
-  ]
+  @floor "3.5.0"
+  @must_admit ["3.5.0", "3.5.1", "3.6.0", "3.9.9"]
+  @must_reject ["1.7.236", "2.0.0", "2.65.0", "2.99.4", "3.0.0", "3.4.0", "3.4.9", "4.0.0"]
 
-  test "the :phoenix_kit requirement admits every core >= 2.65.0 minor and nothing else" do
+  test "the :phoenix_kit requirement admits every core >= 3.5.0 minor and nothing else" do
     requirement = core_requirement()
 
     assert match?({:ok, _parsed}, Version.parse_requirement(requirement)),
@@ -65,7 +44,7 @@ defmodule PhoenixKitDashboards.CorePinConformanceTest do
              "`:phoenix_kit` requirement #{inspect(requirement)} rejects core #{version}. " <>
                "A pin that excludes a core minor at or above the floor breaks " <>
                "`mix deps.get` for every host running this module alongside that " <>
-               "core. Keep the floor patch-precise and the ceiling open (`>= 2.38.0 and < 3.0.0`)."
+               "core. Keep the floor patch-precise and the ceiling open (`>= 3.5.0 and < 4.0.0`)."
     end
 
     for version <- @must_reject do
@@ -81,9 +60,8 @@ defmodule PhoenixKitDashboards.CorePinConformanceTest do
     assert Version.match?(@floor, requirement),
            "the requirement must admit the floor #{@floor} itself"
 
-    refute Version.match?("2.37.5", requirement),
-           "core 2.37.5 lacks `PhoenixKitWeb.Actor` and `Activity.log/3`, which " <>
-             "the actor threading and every activity log call use — the package would not compile"
+    refute Version.match?("3.4.9", requirement),
+           "core 3.4.9 is below the floor #{@floor} and must be rejected"
   end
 
   # Resolution order matters. `Mix.Project.config()` is exact, but it reports the

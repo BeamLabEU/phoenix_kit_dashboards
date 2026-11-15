@@ -311,17 +311,13 @@ defmodule PhoenixKitDashboards.Slots do
   end
 
   defp safe_registry_modules do
-    if Code.ensure_loaded?(PhoenixKit.ModuleRegistry),
-      do: PhoenixKit.ModuleRegistry.all_modules(),
-      else: []
+    PhoenixKit.ModuleRegistry.all_modules()
   rescue
     _ -> []
   end
 
   defp safe_scanned_modules do
-    if Code.ensure_loaded?(PhoenixKit.ModuleDiscovery),
-      do: PhoenixKit.ModuleDiscovery.discover_external_modules(),
-      else: []
+    PhoenixKit.ModuleDiscovery.discover_external_modules()
   rescue
     _ -> []
   catch
@@ -409,9 +405,7 @@ defmodule PhoenixKitDashboards.Slots do
   end
 
   defp module_by_key(key) do
-    if Code.ensure_loaded?(PhoenixKit.ModuleRegistry) do
-      PhoenixKit.ModuleRegistry.get_by_key(key)
-    end
+    PhoenixKit.ModuleRegistry.get_by_key(key)
   rescue
     _ -> nil
   end
@@ -434,11 +428,7 @@ defmodule PhoenixKitDashboards.Slots do
   end
 
   defp has_access?(scope, key) do
-    if Code.ensure_loaded?(Scope) do
-      Scope.has_module_access?(scope, key)
-    else
-      true
-    end
+    Scope.has_module_access?(scope, key)
   rescue
     # Fail CLOSED — never leak a permissioned slot because access evaluation
     # blew up.

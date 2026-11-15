@@ -11,7 +11,7 @@ provider returns from `phoenix_kit_widgets/0`; a dashboard is a user-owned 2D
 canvas of placed widget *instances*, persisted as a JSONB `layout` list, scoped
 personal / system / role.
 
-- **Depends on:** `phoenix_kit` `>= 2.38.0 and < 3.0.0` (Hex). No sibling `phoenix_kit_*` deps —
+- **Depends on:** `phoenix_kit` `>= 3.5.0 and < 4.0.0` (Hex). No sibling `phoenix_kit_*` deps —
   the widget contract is duck-typed, so a provider is never a dependency.
 - **Consumed by:** nothing. The dependency arrow points one way (a provider
   exposes `phoenix_kit_widgets/0`; this module discovers it at runtime).
@@ -127,8 +127,7 @@ Repo-local aliases:
   modal's size / Column-Row / X-Y inputs, and nothing uses
   `phx-update="ignore"`. Never register a hook from an inline `<script>`:
   morphdom does not execute inserted script tags, so the hook vanishes on
-  LiveView navigation. `js_sources/0` carries no `@impl` — older core releases
-  do not declare the callback.
+  LiveView navigation.
 - **Tailwind:** `css_sources/0` returns `[:phoenix_kit_dashboards]`; core's
   `:phoenix_kit_css_sources` compiler wires the host's `@source` at compile
   time, so templates are scanned with no host configuration.
@@ -487,10 +486,7 @@ like flakiness. `PGPOOL` bounds the pool (default
 > migration chain against the shared database, moving the schema for every other
 > module pointed at it.
 
-`test/i18n_test.exs` smoke-tests the per-module i18n wiring. It is tagged
-`:requires_phoenix_kit_i18n_api` and excluded only if `phoenix_kit` ever resolves
-below the release that shipped the `gettext_backend:` API — a defensive guard
-against a stale lockfile, since the `mix.exs` floor already postdates it.
+`test/i18n_test.exs` smoke-tests the per-module i18n wiring.
 
 ## Feature notes
 

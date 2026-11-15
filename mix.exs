@@ -93,29 +93,16 @@ defmodule PhoenixKitDashboards.MixProject do
   defp deps do
     [
       # PhoenixKit provides the Module behaviour, Settings API, Repo helper, and
-      # the ModuleRegistry we query to discover widget providers. Floor is 1.7.189
-      # — the release that ships PhoenixKit.SchemaPrefix (applied to every
-      # table-backed schema in this module). It can't go below 1.7.179 anyway:
-      # that's core migration V139 (the per-dashboard `config` column: type +
-      # named layouts), and V133 (1.7.145) created the phoenix_kit_dashboards
-      # table; an older 1.7.x would resolve an older pin yet lack the `config`
-      # column the layout engine reads.
+      # the ModuleRegistry we query to discover widget providers.
       #
-      # 2.15.0 is the REAL floor, not a rounded-up guess: `Placements.write/3`
-      # calls `Settings.update_setting_with_module/4`, and the arity-4 form
-      # (the `opts` that carry the actor into settings history) first shipped
-      # in 2.15.0. Below it the call raises `UndefinedFunctionError`, which
-      # `write/3` rescues into a generic message — so on an older 2.x every
-      # place/unplace/reprioritise would fail SILENTLY and the admin would
-      # only ever see "That didn't work. Try again."
-      # 2.38.0 is the floor now: the actor and the activity log come from
-      # `PhoenixKitWeb.Actor` and `PhoenixKit.Activity.log/3`, first shipped
-      # there and no longer feature-detected, so a lower core fails to compile.
+      # Floor 3.5.0, the minimum core every PhoenixKit module requires. It
+      # carries everything this module builds on:
+      # `Settings.update_setting_with_module/4`, `PhoenixKitWeb.Actor`,
+      # `PhoenixKit.Activity.log/3` and the `file_references/0` and
+      # `expected_schema/0` callbacks.
       # Patch-precise floor in the compound form, so the ceiling stays open
-      # through every later 2.x minor (see test/core_pin_conformance_test.exs).
-      # Floor 2.65.0: the first core with the `file_references/0` and `expected_schema/0`
-      # callbacks this module implements (`@impl`). The ceiling is open through core 3.x.
-      pk_dep(:phoenix_kit, ">= 2.65.0 and < 4.0.0"),
+      # through every core 3.x (see test/core_pin_conformance_test.exs).
+      pk_dep(:phoenix_kit, ">= 3.5.0 and < 4.0.0"),
 
       # Per-module i18n — own Gettext backend for the sidebar tab labels and
       # this module's own UI strings (see `PhoenixKitDashboards.Gettext`).

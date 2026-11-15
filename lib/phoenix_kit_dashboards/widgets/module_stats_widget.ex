@@ -26,16 +26,12 @@ defmodule PhoenixKitDashboards.Widgets.ModuleStatsWidget do
     prompt = {gettext("Select a module…"), ""}
 
     options =
-      if Code.ensure_loaded?(PhoenixKit.ModuleRegistry) do
-        for mod <- PhoenixKit.ModuleRegistry.all_modules(),
-            Code.ensure_loaded?(mod),
-            function_exported?(mod, :get_config, 0),
-            function_exported?(mod, :module_key, 0),
-            function_exported?(mod, :module_name, 0) do
-          {mod.module_name(), mod.module_key()}
-        end
-      else
-        []
+      for mod <- PhoenixKit.ModuleRegistry.all_modules(),
+          Code.ensure_loaded?(mod),
+          function_exported?(mod, :get_config, 0),
+          function_exported?(mod, :module_key, 0),
+          function_exported?(mod, :module_name, 0) do
+        {mod.module_name(), mod.module_key()}
       end
 
     [prompt | Enum.sort_by(options, fn {name, _} -> name end)]
@@ -151,8 +147,7 @@ defmodule PhoenixKitDashboards.Widgets.ModuleStatsWidget do
   defp module_label(""), do: gettext("Module stats")
 
   defp module_label(module_key) do
-    with true <- Code.ensure_loaded?(PhoenixKit.ModuleRegistry),
-         mod when not is_nil(mod) <- PhoenixKit.ModuleRegistry.get_by_key(module_key),
+    with mod when not is_nil(mod) <- PhoenixKit.ModuleRegistry.get_by_key(module_key),
          true <- function_exported?(mod, :module_name, 0) do
       mod.module_name()
     else
@@ -167,7 +162,6 @@ defmodule PhoenixKitDashboards.Widgets.ModuleStatsWidget do
   defp load_stats(module_key, scope) do
     with true <- module_enabled?(module_key),
          true <- module_accessible?(module_key, scope),
-         true <- Code.ensure_loaded?(PhoenixKit.ModuleRegistry),
          module when not is_nil(module) <- PhoenixKit.ModuleRegistry.get_by_key(module_key),
          true <- function_exported?(module, :get_config, 0) do
       module.get_config() |> stringify()
@@ -181,11 +175,9 @@ defmodule PhoenixKitDashboards.Widgets.ModuleStatsWidget do
   # A disabled module's config is stale operational data — hide it, the same
   # way the Registry hides the module's own widgets.
   defp module_enabled?(module_key) do
-    with true <- Code.ensure_loaded?(PhoenixKit.ModuleRegistry),
-         module when not is_nil(module) <- PhoenixKit.ModuleRegistry.get_by_key(module_key) do
-      not function_exported?(module, :enabled?, 0) or module.enabled?()
-    else
-      _ -> true
+    case PhoenixKit.ModuleRegistry.get_by_key(module_key) do
+      nil -> true
+      module -> not function_exported?(module, :enabled?, 0) or module.enabled?()
     end
   rescue
     _ -> false
@@ -198,11 +190,7 @@ defmodule PhoenixKitDashboards.Widgets.ModuleStatsWidget do
   defp module_accessible?(_module_key, nil), do: true
 
   defp module_accessible?(module_key, scope) do
-    if Code.ensure_loaded?(Scope) do
-      Scope.has_module_access?(scope, module_key)
-    else
-      true
-    end
+    Scope.has_module_access?(scope, module_key)
   rescue
     _ -> false
   end
