@@ -1022,7 +1022,7 @@ defmodule PhoenixKitDashboards.Web.BuilderLive do
       already vanish. These rules strip the remaining per-widget EDIT chrome —
       the drag bar, resize grip, guides, and editor caption — so a wall TV shows
       a clean dashboard, not an editor. (Esc exits; edits still flow in live.) --%>
-      <style>
+      <style nonce={PhoenixKitDashboards.Web.CSP.nonce(:style)}>
         :fullscreen .pk-widget-chrome,
         :fullscreen .pk-resize-handle,
         :fullscreen .pk-grid-caption,

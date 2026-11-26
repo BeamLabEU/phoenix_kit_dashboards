@@ -177,6 +177,21 @@ Repo-local aliases:
   optimistic lock. Do not add a second write path.
 - **UUIDv7 primary keys** (`@primary_key {:uuid, UUIDv7, autogenerate: true}`)
   and `use PhoenixKit.SchemaPrefix` on every table-backed schema.
+- **Content-Security-Policy:** everything rendered must work under a host policy
+  that allows inline code by nonce only (core:
+  `guides/content-security-policy.md`); `test/csp_inline_tags_test.exs` enforces
+  it. An inline `<style>` / `<script>` takes
+  `nonce={PhoenixKitDashboards.Web.CSP.nonce(:style)}` (`:script`), which
+  feature-detects core's `PhoenixKitWeb.CSP` (absent at the core floor: `nil`,
+  no attribute); never call core's module directly. No inline event handlers
+  (`onclick=` …): use a `phx-` binding or a hook in the bundle. A view on bare
+  `Phoenix.LiveView` (the embedded `AdminHomeLive`, `ProjectDashboardLive`)
+  needs `on_mount PhoenixKitDashboards.Web.CSP`, because `live_render/3` skips
+  the live session's `on_mount`. A `<style>` / `<script>` the bundle would
+  create is stamped first with `window.PhoenixKitInternals &&
+  window.PhoenixKitInternals.adoptStyle &&
+  window.PhoenixKitInternals.adoptStyle(el)`; styling through `el.style.*` is
+  not affected by the policy.
 
 ### Landmines
 

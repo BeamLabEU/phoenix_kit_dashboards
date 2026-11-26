@@ -105,7 +105,7 @@ defmodule PhoenixKitDashboards.Widgets.NoteWidget do
         scales the whole rendered markdown. `.prose` sets its own root size,
         so a scoped inherit-override lets the wrapper's cq size through
         (core's <.markdown> declares no style attr to carry it directly). --%>
-        <style>
+        <style nonce={PhoenixKitDashboards.Web.CSP.nonce(:style)}>
           .pk-note-fit .prose {
             font-size: inherit !important;
           }

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- **The inline `<style>` tags carry the host's `Content-Security-Policy` nonce** (a policy with `style-src 'self' 'nonce-…'`; see core's `guides/content-security-policy.md`): the two canvas-reveal rules (grid and free mode), the builder's fullscreen rules and the note widget's prose override. They read it through the new `PhoenixKitDashboards.Web.CSP.nonce/1`, which asks core's `PhoenixKitWeb.CSP` when the installed core has it and renders no attribute otherwise, so the core requirement is unchanged (`>= 3.5.0 and < 4.0.0`).
+- **The embedded views restore the page's nonce.** `AdminHomeLive` (core's `/admin`) and `ProjectDashboardLive` (the projects hub tab) are rendered with `live_render/3`, which skips the live session's `on_mount`; they now take the nonces from their embed session (`on_mount PhoenixKitDashboards.Web.CSP`), which the page fills with core's `PhoenixKitWeb.CSP.nested_session/1`.
+- The module had no inline event handlers and its hook bundle creates no `<style>`/`<script>`; the new `test/csp_inline_tags_test.exs` keeps it that way.
+
 ## 0.8.0 - 2026-10-27
 
 ### Changed

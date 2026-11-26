@@ -87,6 +87,34 @@ defmodule PhoenixKitDashboards.Web.ProjectDashboardLiveTest do
       refute html =~ "open_settings"
     end
 
+    # An embedded view skips the live session's `on_mount`, so the page's CSP
+    # nonces arrive in the embed session (core's `CSP.nested_session/1`).
+    test "the page's CSP nonce in the embed session lands on the inline <style> tags",
+         %{conn: conn, dashboard: dashboard, viewer: viewer} do
+      {:ok, _view, html} =
+        live_isolated(conn, ProjectDashboardLive,
+          session: %{
+            "project_uuid" => Ecto.UUID.generate(),
+            "config" => %{"dashboard_uuid" => dashboard.uuid},
+            "locale" => "en",
+            "current_user_uuid" => viewer.uuid,
+            "phoenix_kit_csp_nonces" => %{"style" => "st-embed-1"}
+          }
+        )
+
+      assert html =~ "<style"
+
+      if Code.ensure_loaded?(PhoenixKitWeb.CSP) and
+           function_exported?(PhoenixKitWeb.CSP, :nonce, 1) do
+        assert html =~ ~s(<style nonce="st-embed-1">)
+        refute html =~ "<style>"
+      else
+        # The published core has no nonce support: the tags render as before.
+        assert html =~ "<style>"
+        refute html =~ "nonce="
+      end
+    end
+
     test "anonymous embed (no current_user_uuid) still renders a shared board",
          %{conn: conn, dashboard: dashboard} do
       {:ok, _view, html} = mount_tab(conn, %{"dashboard_uuid" => dashboard.uuid})

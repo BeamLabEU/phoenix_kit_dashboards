@@ -27,6 +27,11 @@ defmodule PhoenixKitDashboards.Web.AdminHomeLive do
   use Phoenix.LiveView
   use Gettext, backend: PhoenixKitDashboards.Gettext
 
+  # An embedded view skips the live session's `on_mount`: the page's CSP nonces
+  # arrive in the embed session and are restored here (a no-op on a core
+  # without `PhoenixKitWeb.CSP`).
+  on_mount(PhoenixKitDashboards.Web.CSP)
+
   import PhoenixKitDashboards.Web.SlotComponents
 
   alias PhoenixKitDashboards.Dashboards

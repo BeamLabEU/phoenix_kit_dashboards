@@ -332,7 +332,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
         never flash), so without the hook a pure-CSS delayed animation reveals
         it. NOT a <noscript> style — morphdom livens noscript children when
         the LV patches after connect, leaking the styles into the JS-on page. --%>
-        <style>
+        <style nonce={PhoenixKitDashboards.Web.CSP.nonce(:style)}>
           @keyframes pk-canvas-reveal {
             to {
               opacity: 1;
@@ -435,7 +435,7 @@ defmodule PhoenixKitDashboards.Web.BuilderComponents do
       state (same as grid mode). Without JS a pure-CSS delayed animation
       reveals it (a <noscript> style would leak: morphdom livens noscript
       children when the LV patches after connect). --%>
-      <style>
+      <style nonce={PhoenixKitDashboards.Web.CSP.nonce(:style)}>
         @keyframes pk-canvas-reveal {
           to {
             opacity: 1;
